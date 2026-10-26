@@ -4,7 +4,7 @@ Live scores for the teams you follow, shown in your phone's island and in Androi
 
 Football, cricket, NBA, NFL, NHL, MLB and Formula 1. The APK is about 150 KB, with no ads, no account and no analytics.
 
-> **Every line in this repo was written by Claude (Claude Code).** That covers the app, the Gradle-less build, the tests, the emulator setup used to test it, and this README.
+> **Built by Claude (Claude Code):** the app, the Gradle-less build, the emulator setup and this README. One round of fixes and the first device test suite came from a session in Codex.
 
 ## Why it exists
 
