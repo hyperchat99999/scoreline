@@ -8,6 +8,7 @@ import android.graphics.PorterDuffColorFilter;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Rect;
+import android.graphics.Typeface;
 
 /**
  * The island's icon. The island draws it inside a rounded frame on black, so it needs its own
@@ -63,6 +64,25 @@ final class Badge {
         canvas.drawCircle(size / 2f, size / 2f, size / 2f - 2, paint);
         paint.setColor(color | 0xFF000000);
         canvas.drawCircle(size / 2f, size / 2f, size / 2f - 9, paint);
+        return out;
+    }
+
+    /** The race leader for the shade's large icon: their code on their team's colour, like a timing screen. */
+    static Bitmap driver(String code, int color) {
+        int size = 144;
+        Bitmap out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(out);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(color | 0xFF000000);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 2, paint);
+        // Dark text on the light liveries (papaya, teal, silver), white on the rest.
+        paint.setColor(Color.luminance(color | 0xFF000000) > 0.45 ? 0xFF15151E : Color.WHITE);
+        paint.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(54);
+        paint.setLetterSpacing(0.04f);
+        Paint.FontMetrics fm = paint.getFontMetrics();
+        canvas.drawText(code, size / 2f, size / 2f - (fm.ascent + fm.descent) / 2, paint);
         return out;
     }
 

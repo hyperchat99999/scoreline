@@ -16,6 +16,7 @@ The debloat cost me one thing I cared about: live sports scores in the island. T
 
 - **Island and Live Updates:** the match you're following sits in the island and the status-bar chip, showing the score and the clock.
 - **Moments:** goals, touchdowns, wickets, kick-off and full time each get a 5-second expanded card with the team crest.
+- **F1 like a timing screen:** the leader and lap x/y in the island, then the top five with their gaps and a lap bar below.
 - **Up to three matches at once:** one sits in the island and the others stay as quiet cards in the shade. One tap swaps which match is in the island.
 - **Match progress you can read:** one segment per half, quarter, period or inning, a marker for where play is now, and labelled goals.
 - **Same wording across sports:** HT, FT and Final, End of Q3, Top 5th, ET, Pens, Shootout.
@@ -43,7 +44,7 @@ SDK=/path/to/sdk ./build.sh
 
 The first build creates a local signing key, which is ignored by git.
 
-Requirements: min SDK 31, target SDK 36. The island features need Android 16.
+Requirements: Android 12 or later (min SDK 31, target SDK 36). Live Updates and the island need Android 16; older versions get an ordinary live notification with a progress bar.
 
 ## Tests
 

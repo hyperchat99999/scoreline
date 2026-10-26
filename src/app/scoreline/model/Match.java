@@ -1,7 +1,9 @@
 package app.scoreline.model;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * One fixture, normalised across sports. Built once by the ESPN parser and then treated as
@@ -66,6 +68,10 @@ public final class Match {
         public final String name;
         public final String shortName;
         public final String flag;
+        /** From the race timing feed when there is one: ESPN athlete id, gap to the leader ("+2.3"), team colour (0 if unknown). */
+        public String id = "";
+        public String gap = "";
+        public int color;
 
         public Standing(int position, String name, String shortName, String flag) {
             this.position = position;
@@ -78,6 +84,12 @@ public final class Match {
         public String surname() {
             int dot = shortName.lastIndexOf(". ");
             return dot >= 0 ? shortName.substring(dot + 2) : shortName;
+        }
+
+        /** The timing-screen code: "VER" from "M. Verstappen", "HUL" from "N. Hülkenberg". */
+        public String code() {
+            String letters = Normalizer.normalize(surname(), Normalizer.Form.NFD).replaceAll("[^A-Za-z]", "");
+            return letters.substring(0, Math.min(3, letters.length())).toUpperCase(Locale.ROOT);
         }
     }
 
@@ -94,11 +106,13 @@ public final class Match {
     public String session = "";
     public long start;
     public State state = State.PRE;
-    /** Live clock: "67'", "HT", "Q4 2:31", "10.3 ov", "Lap 34". */
+    /** Live clock: "67'", "HT", "Q4 2:31", "10.3 ov", "Lap 34/56". */
     public String clock = "";
     /** Short status from the source: "FT", "Final", "Postponed". */
     public String status = "";
     public int period;
+    /** Race or sprint distance in laps, when the timing feed gives it; 0 when unknown. */
+    public int laps;
     /** Overtime period length from competition/season rules; 0 when unknown. */
     public int overtimeMinutes;
     /** Seconds left in the period for clock-down sports; elapsed seconds for football. */
@@ -136,6 +150,11 @@ public final class Match {
 
     public boolean isLive() {
         return state == State.LIVE;
+    }
+
+    /** A Grand Prix or sprint, run over a set number of laps, as opposed to practice or qualifying. */
+    public boolean isRace() {
+        return sport == Sport.RACING && ("Race".equals(session) || "Sprint".equals(session));
     }
 
     public boolean hasScore() {

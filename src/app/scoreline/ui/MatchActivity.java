@@ -219,6 +219,7 @@ public final class MatchActivity extends BaseActivity {
                 ((TextView) row.findViewById(R.id.position)).setText(String.valueOf(s.position));
                 ((CrestView) row.findViewById(R.id.flag)).set(s.flag, "", "");
                 ((TextView) row.findViewById(R.id.name)).setText(s.name);
+                ((TextView) row.findViewById(R.id.gap)).setText(s.gap);
                 box.addView(row);
             }
             return;

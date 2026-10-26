@@ -16,7 +16,7 @@ public final class Status {
 
     /**
      * Plain words for a live match: "67'", "Half-time", "Q3 5:12", "End of Q3", "Top 5th",
-     * "10.3 ov", "Lap 34". Finished and other states give the result word.
+     * "10.3 ov", "Lap 34/56". Finished and other states give the result word.
      */
     public static String full(Match m) {
         if (m.state == Match.State.POST) return finished(m);

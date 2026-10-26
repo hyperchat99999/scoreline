@@ -28,4 +28,13 @@
         android:layout_weight="1"
         android:ellipsize="end"
         android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/gap"
+        style="@style/Text.Caption"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:fontFeatureSettings="tnum"
+        android:maxLines="1" />
 </LinearLayout>

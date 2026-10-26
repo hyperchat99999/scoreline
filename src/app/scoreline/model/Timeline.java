@@ -19,7 +19,7 @@ public final class Timeline {
     public final String[] labels;
     public final int max;
     public final int value;
-    /** No reliable measure (Test cricket, races): show activity instead. */
+    /** No reliable measure (Test cricket, races of unknown distance): show activity instead. */
     public final boolean indeterminate;
     public final List<Goal> goals;
 
@@ -142,7 +142,12 @@ public final class Timeline {
                 value = (m.period >= 2 ? balls : 0) + played;
                 break;
             }
-            default: // Racing: lap counts aren't published, so show activity rather than a guess.
+            default: // Racing: laps run out of the distance when the timing feed gives it, else activity rather than a guess.
+                if (m.laps > 0) {
+                    segments = new int[] {m.laps};
+                    value = Math.max(0, Math.min(m.laps, m.period - 1));
+                    break;
+                }
                 segments = new int[] {1};
                 value = 0;
                 indeterminate = m.isLive();

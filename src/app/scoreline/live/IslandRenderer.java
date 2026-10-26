@@ -5,6 +5,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Icon;
+import android.os.Build;
 import android.os.Bundle;
 
 import java.util.ArrayList;
@@ -78,7 +79,7 @@ final class IslandRenderer {
     static Notification build(Context c, Match m, String focusId, Art art, Flash flash, boolean moment,
                               PendingIntent open, PendingIntent hide) {
         Content content = content(c, m, focusId, flash);
-        Notification.ProgressStyle progress = progress(Timeline.of(m), content.color, m.isLive());
+        Timeline t = Timeline.of(m);
 
         Icon crest = art.focus != null ? Icon.createWithBitmap(art.focus) : Icon.createWithResource(c, R.drawable.ic_stat_scoreline);
         Bundle extras = new Bundle();
@@ -94,13 +95,12 @@ final class IslandRenderer {
             extras.putParcelable(ISLAND_CAPSULE_TAP, open);
         }
 
-        return new Notification.Builder(c, Notifications.LIVE)
+        Notification.Builder b = new Notification.Builder(c, Notifications.LIVE)
                 // The steady island is this icon plus the short critical text, so the icon is the crest.
                 .setSmallIcon(crest)
-                .setSubText(m.leagueName)
+                .setSubText(content.sub(m))
                 .setContentTitle(content.title)
-                .setContentText(freshness(m, content.text))
-                .setShortCriticalText(content.chip)
+                .setContentText(content.body(m))
                 .setColor(content.color)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
@@ -114,10 +114,17 @@ final class IslandRenderer {
                 .setDeleteIntent(hide)
                 .addAction(new Notification.Action.Builder(
                         Icon.createWithResource(c, R.drawable.ic_close), c.getString(R.string.act_stop), hide).build())
-                .setStyle(progress)
-                .setLargeIcon(art.matchup)
-                .addExtras(extras)
-                .build();
+                .setLargeIcon(content.large != null ? content.large : art.matchup)
+                .addExtras(extras);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            LiveUpdate.apply(b, t, content.color, m.isLive(), content.chip);
+        } else {
+            // Before Android 16 there are no Live Updates: an ordinary ongoing notification, with the
+            // match time as the classic progress bar under the text.
+            b.setStyle(new Notification.BigTextStyle().bigText(content.body(m)))
+                    .setProgress(t.max, Math.min(t.value, t.max), t.indeterminate);
+        }
+        return b.build();
     }
 
     /**
@@ -130,10 +137,10 @@ final class IslandRenderer {
         // Crests rather than the app's glyph: the card is about the match, not the app.
         Notification.Builder b = new Notification.Builder(c, Notifications.CARDS)
                 .setSmallIcon(art.card != null ? Icon.createWithBitmap(art.card) : Icon.createWithResource(c, R.drawable.ic_stat_scoreline))
-                .setSubText(m.leagueName)
+                .setSubText(content.sub(m))
                 .setContentTitle(content.title)
-                .setContentText(freshness(m, content.text))
-                .setStyle(new Notification.BigTextStyle().bigText(freshness(m, content.text)))
+                .setContentText(content.body(m))
+                .setStyle(new Notification.BigTextStyle().bigText(content.body(m)))
                 .setColor(content.color)
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false)
@@ -143,7 +150,7 @@ final class IslandRenderer {
                 .setDeleteIntent(hide)
                 .addAction(new Notification.Action.Builder(
                         Icon.createWithResource(c, R.drawable.ic_island_on), c.getString(R.string.act_show), toIsland).build());
-        if (art.matchup != null) b.setLargeIcon(art.matchup);
+        if (content.large != null || art.matchup != null) b.setLargeIcon(content.large != null ? content.large : art.matchup);
         return b.build();
     }
 
@@ -182,6 +189,18 @@ final class IslandRenderer {
         int color;
         String title = "";
         String text = "";
+        /** Header text in place of the league name ("Lap 34/56"), or "". */
+        String sub = "";
+        /** Large icon in place of the matchup (the race leader), or null. */
+        Bitmap large;
+
+        String body(Match m) {
+            return freshness(m, text);
+        }
+
+        String sub(Match m) {
+            return sub.isEmpty() ? m.leagueName : sub;
+        }
     }
 
     private static Content content(Context c, Match m, String focusId, Flash flash) {
@@ -199,7 +218,7 @@ final class IslandRenderer {
         }
 
         if (m.sport == Sport.RACING) {
-            race(c, m, out);
+            race(c, m, flash, out);
             return out;
         }
         Match.Side us = m.sideOf(focusId);
@@ -281,39 +300,60 @@ final class IslandRenderer {
         }
     }
 
-    private static void race(Context c, Match m, Content out) {
-        out.color = F1_RED;
-        out.capsuleColor = F1_RED;
+    private static void race(Context c, Match m, Flash flash, Content out) {
         Match.Standing leader = m.standings.isEmpty() || m.standings.get(0).position != 1 ? null : m.standings.get(0);
+        String code = leader == null ? "" : leader.code();
+        out.color = F1_RED;
+        // The capsule wears the leader's team colour once the timing feed gives it.
+        out.capsuleColor = leader != null && leader.color != 0 ? Ui.capsule(leader.color) : F1_RED;
         out.title = m.title + " · " + m.session;
-        String code = leader == null ? "" : leader.surname().substring(0, Math.min(3, leader.surname().length())).toUpperCase(java.util.Locale.ROOT);
-        // Same grammar as the team sports: what's next and when, then who leads, then the result.
-        // A finished race names its winner; a finished practice or qualifying, who topped it.
-        boolean race = "Race".equalsIgnoreCase(m.session) || "Sprint".equalsIgnoreCase(m.session);
+        // Same grammar as the team sports: what's next and when, then who leads (with the lap, in a
+        // race of known distance), then the result. A finished race names its winner; a finished
+        // practice or qualifying, who topped it.
+        String lap = code + " " + Math.min(m.period, m.laps) + "/" + m.laps;
         out.chip = m.state == Match.State.PRE ? prefix(Espn.shortSession(m.session), chipTime(c, m.start))
                 : leader == null ? (m.state == Match.State.POST ? Status.finished(m) : Espn.shortSession(m.session))
-                : m.state != Match.State.POST ? "P1 " + code
-                : race ? code + " won"
+                : m.state != Match.State.POST ? (m.laps > 0 && lap.length() <= Status.CHIP ? lap : "P1 " + code)
+                : m.isRace() ? code + " won"
                 : prefix(Espn.shortSession(m.session), code);
         switch (m.state) {
             case PRE:
                 out.left = Espn.shortSession(m.session);
                 out.capsule = Ui.time(c, m.start);
                 out.text = join(Ui.when(c, m.start), m.venue);
-                break;
+                return;
             case LIVE:
-                out.left = leader == null ? Espn.shortSession(m.session) : "P1 " + code(leader);
-                out.capsule = capsule(m);
-                out.text = join(Status.full(m), podium(m));
+                out.left = Espn.shortSession(m.session);
+                out.capsule = flash != null ? flash.word : capsule(m);
+                out.sub = Status.full(m);
+                out.text = Status.full(m);
                 break;
             default:
-                out.left = leader == null ? Espn.shortSession(m.session) : "P1 " + code(leader);
-                out.capsule = Status.finished(m);
-                out.capsuleColor = FINISHED;
-                out.text = podium(m);
+                out.left = Espn.shortSession(m.session);
+                out.capsule = m.isRace() && leader != null ? "WINS" : Status.finished(m);
+                if (!m.isRace() || leader == null) out.capsuleColor = FINISHED;
         }
+        if (leader == null) return;
+        // As on a timing screen: the leader on the left of the island and as the shade's large icon,
+        // the lap in the capsule on the right, and the top five with their gaps underneath.
+        out.left = code;
+        out.title = leader.surname() + (!m.isRace() ? " fastest" : m.state == Match.State.POST ? " wins" : " leads");
+        out.text = tower(m);
+        out.large = Badge.driver(code, leader.color != 0 ? leader.color : F1_RED);
     }
 
+    /**
+     * The top five as on a timing screen: "1 VER · 2 NOR +2.3 · 3 LEC +5.1 · 4 HAM +8.0 · 5 PIA +9.9".
+     * No-break spaces hold each entry together, so a line never ends between "5" and "PIA".
+     */
+    static String tower(Match m) {
+        List<String> rows = new ArrayList<>();
+        for (int i = 0; i < Math.min(5, m.standings.size()); i++) {
+            Match.Standing s = m.standings.get(i);
+            rows.add((s.position + " " + s.code() + (s.gap.isEmpty() ? "" : " " + s.gap)).replace(' ', '\u00a0'));
+        }
+        return join(rows.toArray(new String[0]));
+    }
 
     /** The expanded capsule: the full words when they fit ("Half-time", "Q3 5:12"), else the short form. */
     private static String capsule(Match m) {
@@ -339,21 +379,6 @@ final class IslandRenderer {
         int minute = cal.get(java.util.Calendar.MINUTE);
         String ampm = cal.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM ? "am" : "pm";
         return minute == 0 ? hour + ampm : String.format(java.util.Locale.ROOT, "%d:%02d%s", hour, minute, ampm);
-    }
-
-    /** Surname if it fits the island, otherwise a three-letter code. */
-    private static String code(Match.Standing s) {
-        String surname = s.surname();
-        return surname.length() <= 9 ? surname : surname.substring(0, 3).toUpperCase(java.util.Locale.ROOT);
-    }
-
-    private static String podium(Match m) {
-        List<String> top = new ArrayList<>();
-        for (int i = 0; i < Math.min(3, m.standings.size()); i++) {
-            Match.Standing s = m.standings.get(i);
-            top.add(s.position + " " + s.surname());
-        }
-        return String.join("   ", top);
     }
 
     private static String innings(Match.Side s) {
@@ -392,17 +417,27 @@ final class IslandRenderer {
     // ---- Progress bar --------------------------------------------------------------------------
 
     /**
-     * Match time as a segmented bar (one segment per half, quarter or innings) with a knob where
-     * play is now, like a media scrubber. Nothing else goes on the bar: crests at its two ends read
-     * as a tug-of-war rather than a clock, and Android draws progress points as square notches that
-     * look like extra period breaks. Who scored and when is in the text above the bar.
+     * Android 16's Live Update parts: the chip text and the progress style. In a class of their own
+     * so older Android, where they don't exist, never loads anything that refers to them.
      */
-    private static Notification.ProgressStyle progress(Timeline t, int color, boolean live) {
-        Notification.ProgressStyle p = new Notification.ProgressStyle()
-                .setStyledByProgress(true)
-                .setProgressIndeterminate(t.indeterminate);
-        for (int len : t.segments) p.addProgressSegment(new Notification.ProgressStyle.Segment(len).setColor(color));
-        if (live && !t.indeterminate) p.setProgressTrackerIcon(Icon.createWithBitmap(Badge.tracker(color)));
-        return p.setProgress(t.value);
+    private static final class LiveUpdate {
+        static void apply(Notification.Builder b, Timeline t, int color, boolean live, String chip) {
+            b.setShortCriticalText(chip).setStyle(progress(t, color, live));
+        }
+
+        /**
+         * Match time as a segmented bar (one segment per half, quarter or innings) with a knob where
+         * play is now, like a media scrubber. Nothing else goes on the bar: crests at its two ends read
+         * as a tug-of-war rather than a clock, and Android draws progress points as square notches that
+         * look like extra period breaks. Who scored and when is in the text above the bar.
+         */
+        private static Notification.ProgressStyle progress(Timeline t, int color, boolean live) {
+            Notification.ProgressStyle p = new Notification.ProgressStyle()
+                    .setStyledByProgress(true)
+                    .setProgressIndeterminate(t.indeterminate);
+            for (int len : t.segments) p.addProgressSegment(new Notification.ProgressStyle.Segment(len).setColor(color));
+            if (live && !t.indeterminate) p.setProgressTrackerIcon(Icon.createWithBitmap(Badge.tracker(color)));
+            return p.setProgress(t.value);
+        }
     }
 }

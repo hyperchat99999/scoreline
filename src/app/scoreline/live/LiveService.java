@@ -253,13 +253,13 @@ public final class LiveService extends Service {
         worker.postDelayed(tick, interval);
     }
 
-    /** Detects kick-off, goals and full time between two snapshots of the same match. */
+    /** Detects kick-off, goals, a race's lead changes and full time between two snapshots of the same match. */
     private void react(Tracked t, Match fresh, long now) {
         Match old = t.match;
         boolean alerts = app.store().alerts() && app.store().focus(fresh) != null;
         String vs = fresh.sport.headToHead() ? fresh.home.team.shortName + " v " + fresh.away.team.shortName : fresh.title;
 
-        if (old.state == Match.State.PRE && fresh.isLive()) moment(t, null, now);
+        if (old.state == Match.State.PRE && fresh.isLive()) moment(t, fresh.isRace() ? new IslandRenderer.Flash("LIGHTS OUT", null) : null, now);
         if (old.state == Match.State.PRE && fresh.isLive() && alerts) {
             Notifications.alert(this, fresh, getString(R.string.alert_kickoff) + " · " + vs, fresh.leagueName, art(t).focus);
         }
@@ -268,6 +268,7 @@ public final class LiveService extends Service {
         if (fresh.sport == Sport.CRICKET && fresh.isLive() && wickets(fresh) > wickets(old)) {
             moment(t, new IslandRenderer.Flash("WICKET", null), now);
         }
+        if (fresh.isRace() && old.isLive() && fresh.isLive()) raced(t, old, fresh, now);
         t.scoreline = scoreline;
         if (old.state != Match.State.POST && fresh.state == Match.State.POST) moment(t, null, now);
         if (old.state != Match.State.POST && fresh.state == Match.State.POST && alerts) {
@@ -387,6 +388,17 @@ public final class LiveService extends Service {
     private Bitmap islandCrest(Team team) {
         Bitmap b = app.images().load(team.crest(true), 160);
         return b != null ? b : app.images().load(team.logo, 160);
+    }
+
+    /** A race's news: a new leader, then the final lap. Practice and qualifying reorder too often to flash. */
+    private static void raced(Tracked t, Match old, Match fresh, long now) {
+        String was = old.standings.isEmpty() ? "" : old.standings.get(0).name;
+        String is = fresh.standings.isEmpty() ? "" : fresh.standings.get(0).name;
+        if (!was.isEmpty() && !is.isEmpty() && !was.equals(is)) {
+            moment(t, new IslandRenderer.Flash("NEW LEADER", null), now);
+        } else if (fresh.laps > 0 && fresh.period >= fresh.laps && old.period < fresh.laps) {
+            moment(t, new IslandRenderer.Flash("FINAL LAP", null), now);
+        }
     }
 
     /**

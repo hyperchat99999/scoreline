@@ -53,9 +53,13 @@ public final class SportsSimulation extends Instrumentation {
             case FOOTBALL:m.league="nfl";m.period=4;m.clock="Q4 1:20";m.clockSeconds=80;break;
             case HOCKEY:m.league="nhl";m.period=3;m.clock="P3 2:00";m.clockSeconds=120;break;
             case BASEBALL:m.league="mlb";m.period=9;m.clock="Mid 9";break;
-            case RACING:
-                m.league="f1";m.home=null;m.away=null;m.session="Race";m.clock="Lap 34";
-                m.standings.add(new Match.Standing(1,"Max Verstappen","M. Verstappen",""));break;
+            case RACING: {
+                m.league="f1";m.home=null;m.away=null;m.session="Race";m.laps=56;m.period=34;m.clock="Lap 34/56";
+                String[][] grid={{"Max Verstappen","M. Verstappen","","3671C6"},{"Lando Norris","L. Norris","+2.3","FF8000"},
+                        {"Charles Leclerc","C. Leclerc","+5.1","E8002D"},{"Lewis Hamilton","L. Hamilton","+8.0","E8002D"},{"Oscar Piastri","O. Piastri","+9.9","FF8000"}};
+                for(int i=0;i<grid.length;i++){Match.Standing s=new Match.Standing(i+1,grid[i][0],grid[i][1],"");s.gap=grid[i][2];s.color=0xFF000000|Integer.parseInt(grid[i][3],16);m.standings.add(s);}
+                break;
+            }
             default:m.league="eng.1";
         }
         return m;
@@ -122,6 +126,10 @@ public final class SportsSimulation extends Instrumentation {
         Match a=(Match)call(Espn.class,"race",sig,null,event,practice,"f1","F1");
         Match b=(Match)call(Espn.class,"race",sig,null,event,race,"f1","F1");
         check(!a.key().equals(b.key()),"F1 sessions have different keys");
+        Class<?>[] gs={String.class,boolean.class};
+        check("+13.0".equals(call(Espn.class,"gap",gs,null,"+13.078",true)) && "+0.112".equals(call(Espn.class,"gap",gs,null,"0.112",false))
+                && "+1:02.3".equals(call(Espn.class,"gap",gs,null,"+1:02.345",true)) && "+1 Lap".equals(call(Espn.class,"gap",gs,null,"+1 Lap",true)),"F1 gaps: tenths in a race, thousandths otherwise");
+        check("HUL".equals(new Match.Standing(9,"","N. H\u00fclkenberg","").code()) && "DEV".equals(new Match.Standing(9,"","N. de Vries","").code()),"F1 driver codes");
     }
     private PendingIntent noop() {
         return PendingIntent.getActivity(getTargetContext(),991,new Intent(getTargetContext(),app.scoreline.ui.HomeActivity.class),PendingIntent.FLAG_IMMUTABLE);
@@ -154,6 +162,15 @@ public final class SportsSimulation extends Instrumentation {
         Match m=fixture(Sport.RACING);String livePos=chip(notification(m,false));m.state=Match.State.POST;
         check("VER won".equals(chip(notification(m,false))),"F1 race result names the winner");
         m.session="Practice 3";check("FP3 VER".equals(chip(notification(m,false))) && !chip(notification(m,false)).equals(livePos),"F1 finished session is distinct from live P1");
+        m=fixture(Sport.RACING);Notification race=notification(m,true);
+        check("VER 34/56".equals(chip(race)),"F1 chip: leader and lap");
+        check("Verstappen leads".equals(String.valueOf(race.extras.getCharSequence(Notification.EXTRA_TITLE))),"F1 title names the leader");
+        check(String.valueOf(race.extras.getCharSequence(Notification.EXTRA_TEXT)).startsWith("1\u00a0VER \u00b7 2\u00a0NOR\u00a0+2.3 \u00b7 3\u00a0LEC\u00a0+5.1"),"F1 text: top five with gaps");
+        check("VER".equals(String.valueOf(race.extras.getCharSequence("island.superx.leftInfo.content")))
+                && "Lap 34/56".equals(String.valueOf(race.extras.getCharSequence("island.superx.rightInfo.capsuleContent"))),"F1 island: leader left, lap right");
+        check("Lap 34/56".equals(String.valueOf(race.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))) && race.getLargeIcon()!=null,"F1 header lap and leader tile");
+        check(Timeline.of(m).max==56 && Timeline.of(m).value==33 && !Timeline.of(m).indeterminate,"F1 lap progress");
+        m.laps=0;check("P1 VER".equals(chip(notification(m,false))) && Timeline.of(m).indeterminate,"F1 without the distance falls back to P1");
         m=fixture(Sport.CRICKET);m.battingTeamId="unknown";
         check(!chip(notification(m,false)).contains("184/3"),"Unknown cricket batting side must not show home as batting");
         m=fixture(Sport.BASKETBALL);m.updatesDelayed=true;

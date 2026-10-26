@@ -21,7 +21,10 @@ public class TimelineTest {
         m.battingTeamId="";check(Timeline.of(m).indeterminate,"Unknown batting side");
         m=match(Sport.RACING);check(Timeline.of(m).indeterminate,"No invented race progress");
         m.state=Match.State.POST;check(Timeline.of(m).value==Timeline.of(m).max,"Finished race");
-        System.out.println("PASS: 13 sport progress regression checks");
+        m=match(Sport.RACING);m.laps=56;m.period=34;
+        check(!Timeline.of(m).indeterminate && Timeline.of(m).max==56 && Timeline.of(m).value==33,"Race laps run");
+        m.period=60;check(Timeline.of(m).value==56,"Lap count past the distance is clamped");
+        System.out.println("PASS: 15 sport progress regression checks");
     }
     static Match match(Sport sport) {
         Match m=new Match();m.sport=sport;m.state=Match.State.LIVE;

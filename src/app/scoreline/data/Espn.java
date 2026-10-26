@@ -37,6 +37,10 @@ public final class Espn {
     private static final String SITE = "https://site.api.espn.com/apis/site/v2/sports/";
     private static final String CRICKET_TICKER = "https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=cricket&lang=en";
     private static final String CRICKET_SERIES = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/";
+    private static final String RACE_TIMING = "https://sports.core.api.espn.com/v2/sports/racing/leagues/";
+    /** Drivers given a gap to the leader: the top five, as on the island. */
+    private static final int GAPS = 5;
+    private static final Pattern GAP_TIME = Pattern.compile("\\+?(\\d+:)?\\d+\\.\\d+");
     private static final ZoneId ESPN_DAY = ZoneId.of("America/New_York");
     private static final DateTimeFormatter BASIC = DateTimeFormatter.BASIC_ISO_DATE;
     private static final Pattern OVERS = Pattern.compile("([\\d.]+)(?:/(\\d+))? ov");
@@ -174,9 +178,11 @@ public final class Espn {
                 pool = cricket(LIVE);
                 break;
             }
-            case RACING:
-                pool = scoreboard(Sport.RACING, m.league, null, LIVE);
-                break;
+            case RACING: {
+                Match hit = find(scoreboard(Sport.RACING, m.league, null, LIVE), m.id);
+                if (hit != null && hit.state != Match.State.PRE) timing(hit);
+                return hit;
+            }
             default:
                 pool = scoreboard(m.sport, m.league, day(m.start, ESPN_DAY), LIVE);
                 Match hit = find(pool, m.id);
@@ -464,21 +470,78 @@ public final class Espn {
         m.start = Json.time(Json.str(pick, "date"));
         m.session = session(Json.str(Json.obj(pick, "type"), "abbreviation"));
         applyStatus(m, pick.optJSONObject("status"));
-        if (m.state == Match.State.LIVE) {
-            boolean laps = m.session.equals("Race") || m.session.equals("Sprint");
-            m.clock = laps && m.period > 0 ? "Lap " + m.period : shortSession(m.session);
-        }
+        if (m.state == Match.State.LIVE) m.clock = m.isRace() && m.period > 0 ? "Lap " + m.period : shortSession(m.session);
         List<JSONObject> drivers = new ArrayList<>(Json.list(pick, "competitors"));
         drivers.sort(Comparator.comparingInt(c -> c.optInt("order", 99)));
         for (JSONObject c : drivers) {
             JSONObject a = c.optJSONObject("athlete");
             int position = c.optInt("order", 0);
             if (position <= 0 || a == null) continue;
-            m.standings.add(new Match.Standing(position, Json.str(a, "displayName"), Json.str(a, "shortName"),
-                    Json.str(Json.obj(a, "flag"), "href")));
+            Match.Standing s = new Match.Standing(position, Json.str(a, "displayName"), Json.str(a, "shortName"),
+                    Json.str(Json.obj(a, "flag"), "href"));
+            s.id = Json.str(c, "id");
+            m.standings.add(s);
         }
         m.link = link(e);
         return m;
+    }
+
+    /**
+     * What the scoreboard leaves out, from ESPN's race timing: team colours, the race distance and
+     * the top five's gaps to the leader. Only for a session someone follows or has open, so the
+     * extra requests stay few. Each piece is best effort; without it the island shows the order alone.
+     */
+    private void timing(Match m) {
+        int colon = m.id.indexOf(':');
+        if (colon < 0) return;
+        String base = RACE_TIMING + m.league + "/events/" + m.id.substring(0, colon) + "/competitions/" + m.id.substring(colon + 1);
+        long maxAge = m.isLive() ? LIVE : LONG;
+        try {
+            // Team colours don't change during a session, so this is fetched once.
+            for (JSONObject c : Json.list(json(base, LONG), "competitors")) {
+                String hex = Json.str(Json.obj(c, "vehicle"), "teamColor");
+                if (!hex.matches("[0-9A-Fa-f]{6}")) continue;
+                for (Match.Standing s : m.standings) {
+                    if (s.id.equals(Json.str(c, "id"))) s.color = 0xFF000000 | Integer.parseInt(hex, 16);
+                }
+            }
+        } catch (IOException | RuntimeException ignored) {
+        }
+        if (m.isRace()) {
+            try {
+                m.laps = (int) stat(json(base + "/statistics", LONG), "laps").optDouble("value", 0);
+            } catch (IOException | RuntimeException ignored) {
+            }
+            if (m.laps > 0 && m.isLive() && m.period > 0) m.clock = "Lap " + Math.min(m.period, m.laps) + "/" + m.laps;
+        }
+        for (int i = 1; i < Math.min(GAPS, m.standings.size()); i++) {
+            Match.Standing s = m.standings.get(i);
+            if (s.id.isEmpty()) continue;
+            try {
+                s.gap = gap(Json.str(stat(json(base + "/competitors/" + s.id + "/statistics", maxAge), "behindTime"), "displayValue"), m.isRace());
+            } catch (IOException | RuntimeException ignored) {
+            }
+        }
+    }
+
+    /** A named statistic from an ESPN stats document (a competition's or a driver's), or an empty object. */
+    private static JSONObject stat(JSONObject root, String name) {
+        JSONObject splits = root.optJSONObject("splits");
+        for (JSONObject category : Json.list(splits != null ? splits : root, "categories")) {
+            for (JSONObject s : Json.list(category, "stats")) if (name.equals(Json.str(s, "name"))) return s;
+        }
+        return new JSONObject();
+    }
+
+    /**
+     * "+13.078" becomes "+13.0" in a race, where gaps are read in tenths; practice and qualifying
+     * keep thousandths. Anything else ("+1 Lap") is shown as given.
+     */
+    static String gap(String raw, boolean race) {
+        String g = raw.trim();
+        if (!GAP_TIME.matcher(g).matches()) return g;
+        if (!g.startsWith("+")) g = "+" + g;
+        return race ? g.substring(0, g.indexOf('.') + 2) : g;
     }
 
     private static String session(String abbr) {
