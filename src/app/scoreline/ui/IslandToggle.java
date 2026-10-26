@@ -1,8 +1,5 @@
 package app.scoreline.ui;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
-
 import java.util.List;
 
 import app.scoreline.App;
@@ -10,6 +7,7 @@ import app.scoreline.R;
 import app.scoreline.core.Ui;
 import app.scoreline.data.Store;
 import app.scoreline.live.LiveService;
+import app.scoreline.live.Notifications;
 import app.scoreline.live.Scheduler;
 import app.scoreline.live.Tracker;
 import app.scoreline.model.Match;
@@ -50,8 +48,8 @@ final class IslandToggle {
             a.toast(R.string.island_removed);
             return;
         }
-        if (a.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            a.requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 1);
+        if (!Notifications.enabled(a)) {
+            Notifications.ask(a, 1);
             return;
         }
         store.pin(m);

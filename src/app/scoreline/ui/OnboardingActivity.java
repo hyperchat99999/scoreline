@@ -1,8 +1,6 @@
 package app.scoreline.ui;
 
-import android.Manifest;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Insets;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -13,6 +11,7 @@ import android.view.WindowInsets;
 import android.widget.TextView;
 
 import app.scoreline.R;
+import app.scoreline.live.Notifications;
 import app.scoreline.live.Scheduler;
 import app.scoreline.ui.widget.CrestView;
 
@@ -57,8 +56,7 @@ public final class OnboardingActivity extends BaseActivity {
         showDemo(0, false);
 
         findViewById(R.id.start).setOnClickListener(v -> startActivityForResult(DiscoverActivity.onboardingIntent(this), PICK));
-        findViewById(R.id.allowNotifications).setOnClickListener(v ->
-                requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 2));
+        findViewById(R.id.allowNotifications).setOnClickListener(v -> Notifications.ask(this, 2));
         findViewById(R.id.allowBackground).setOnClickListener(v -> {
             if (!Scheduler.unrestricted(this)) {
                 startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
@@ -103,7 +101,7 @@ public final class OnboardingActivity extends BaseActivity {
     }
 
     private void updatePermissions() {
-        boolean notif = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        boolean notif = Notifications.enabled(this);
         permission(findViewById(R.id.allowNotifications), notif);
         permission(findViewById(R.id.allowBackground), Scheduler.unrestricted(this));
     }

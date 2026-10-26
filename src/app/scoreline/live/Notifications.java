@@ -1,5 +1,7 @@
 package app.scoreline.live;
 
+import android.Manifest;
+import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -8,6 +10,8 @@ import android.app.TaskStackBuilder;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.os.Build;
+import android.provider.Settings;
 
 import java.util.List;
 
@@ -58,6 +62,19 @@ public final class Notifications {
 
     public static boolean enabled(Context c) {
         return c.getSystemService(NotificationManager.class).areNotificationsEnabled();
+    }
+
+    /**
+     * Asks to post notifications. Android 13 added a permission for it; before that they're on
+     * unless turned off in Settings, so that's where this goes instead (asking for a permission
+     * the system doesn't have is refused without a prompt).
+     */
+    public static void ask(Activity a, int requestCode) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            a.requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, requestCode);
+        } else {
+            a.startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, a.getPackageName()));
+        }
     }
 
     /** Opens the match screen with Home underneath, so Back behaves. */
