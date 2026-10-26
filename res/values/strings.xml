@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Scoreline</string>
+
+    <!-- Home -->
+    <string name="section_live">Live now</string>
+    <string name="section_today">Today</string>
+    <string name="section_upcoming">Coming up</string>
+    <string name="section_results">Results</string>
+    <string name="add_follow">Add</string>
+    <string name="all">All</string>
+    <string name="discover">Find teams and competitions</string>
+    <string name="settings">Settings</string>
+    <string name="empty_title">Nothing on right now</string>
+    <string name="empty_body">Matches for the teams and competitions you follow will show up here.</string>
+    <string name="empty_none_title">Follow your teams</string>
+    <string name="empty_none_body">Pick the clubs, national teams and competitions you care about. Their live scores will appear here and in your status bar island.</string>
+    <string name="find_teams">Find teams</string>
+    <string name="offline">You\'re offline. Showing the last scores we saved.</string>
+    <string name="updated">Scores by ESPN · Updated %1$s</string>
+    <string name="island">Island</string>
+    <string name="in_island">In Island</string>
+    <string name="island_scheduled">Will appear in your island at %1$s</string>
+    <string name="island_added">Showing in your island</string>
+    <string name="island_removed">Removed from your island</string>
+    <string name="island_failed">Couldn\'t start live updates. Allow notifications in Settings.</string>
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="live">LIVE</string>
+    <string name="vs">vs</string>
+
+    <!-- Match -->
+    <string name="key_moments">Key moments</string>
+    <string name="standings">Running order</string>
+    <string name="open_espn">Full match centre on ESPN</string>
+    <string name="show_in_island">Show in Island</string>
+    <string name="showing_in_island">Showing in Island</string>
+    <string name="no_moments">No goals yet</string>
+    <string name="score_by">Score by %1$s</string>
+    <string name="unit_quarter">quarter</string>
+    <string name="unit_period">period</string>
+    <string name="unit_inning">inning</string>
+    <string name="total">T</string>
+    <string name="kick_off">Kick-off %1$s</string>
+
+    <!-- Discover -->
+    <string name="search_hint">Search teams and competitions</string>
+    <string name="competitions">Competitions</string>
+    <string name="popular_teams">Popular teams</string>
+    <string name="all_teams">All teams</string>
+    <string name="follow">Follow</string>
+    <string name="following">Following</string>
+    <string name="no_results">No matches for “%1$s”</string>
+    <string name="loading">Loading…</string>
+    <string name="load_failed">Couldn\'t load teams. Check your connection.</string>
+    <string name="pick_title">Who do you follow?</string>
+    <string name="pick_body">Pick a few teams or competitions. You can change this any time.</string>
+    <string name="continue_n">Continue · %1$d</string>
+    <string name="continue_plain">Continue</string>
+
+    <!-- Onboarding -->
+    <string name="onb_title">Live scores,\nright in your island</string>
+    <string name="onb_body">Follow your teams and watch the score update around the camera. No need to open an app.</string>
+    <string name="get_started">Get started</string>
+    <string name="perm_title">Never miss a moment</string>
+    <string name="perm_body">Scoreline needs two things to keep your island live during a match.</string>
+    <string name="perm_notif_title">Notifications</string>
+    <string name="perm_notif_body">The island is a live notification. We also tell you about kick-offs, goals and results.</string>
+    <string name="perm_battery_title">Background updates</string>
+    <string name="perm_battery_body">Lets Scoreline start your island at kick-off even when the app is closed.</string>
+    <string name="allow">Allow</string>
+    <string name="allowed">Allowed</string>
+    <string name="done">Done</string>
+    <string name="skip">Not now</string>
+
+    <!-- Settings -->
+    <string name="set_island">Live Island</string>
+    <string name="set_auto">Show my teams automatically</string>
+    <string name="set_auto_body">When a team you follow is playing, its match appears in your island.</string>
+    <string name="set_comps">Include competitions</string>
+    <string name="set_comps_body">Also show matches from competitions you follow, not just your teams.</string>
+    <string name="set_alerts">Match alerts</string>
+    <string name="set_alerts_body">Kick-off, goals, touchdowns and results for your teams.</string>
+    <string name="set_background">Background updates</string>
+    <string name="set_background_ok">Allowed. Your island starts at kick-off.</string>
+    <string name="set_background_off">Restricted. Tap to let your island start at kick-off.</string>
+    <string name="set_notifications">Notification settings</string>
+    <string name="set_following">Manage teams and competitions</string>
+    <string name="set_about">About</string>
+    <string name="set_about_body">Scores, crests and logos are provided by ESPN. Scoreline isn\'t affiliated with ESPN, any league or any team.</string>
+    <string name="version">Version %1$s</string>
+
+    <!-- Notifications -->
+    <string name="ch_live">Live scores</string>
+    <string name="ch_live_body">The live score shown in your status bar island during a match.</string>
+    <string name="ch_alerts">Match alerts</string>
+    <string name="ch_alerts_body">Kick-offs, goals and results for teams you follow.</string>
+    <string name="ch_suggest">Live match reminders</string>
+    <string name="ch_suggest_body">Shown when a followed match starts but Scoreline can\'t open the island on its own.</string>
+    <string name="act_stop">Hide from island</string>
+    <string name="act_show">Show in island</string>
+    <string name="alert_kickoff">Kick-off</string>
+    <string name="alert_goal">Goal · %1$s</string>
+    <string name="alert_touchdown">Touchdown · %1$s</string>
+    <string name="alert_final">Full time</string>
+    <string name="alert_result">Result</string>
+    <string name="suggest_title">%1$s is live</string>
+    <string name="suggest_body">Tap to follow it in your island.</string>
+    <string name="ch_cards">Other live matches</string>
+    <string name="ch_cards_body">Followed matches that are on while another one is in your island.</string>
+    <string name="ch_service">Live updates</string>
+    <string name="ch_service_body">A quiet notification Android requires while Scoreline keeps your island updated.</string>
+    <string name="service_title">Keeping your island live</string>
+
+    <!-- Sports -->
+    <string name="sport_soccer">Football</string>
+    <string name="sport_cricket">Cricket</string>
+    <string name="sport_basketball">Basketball</string>
+    <string name="sport_racing">Formula 1</string>
+    <string name="sport_football">American football</string>
+    <string name="sport_hockey">Ice hockey</string>
+    <string name="sport_baseball">Baseball</string>
+</resources>

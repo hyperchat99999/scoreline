@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One competition's fixtures or results for a day, in a single card; rows are added in code. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/gutter"
+    android:layout_marginTop="5dp"
+    android:layout_marginEnd="@dimen/gutter"
+    android:layout_marginBottom="5dp"
+    android:background="@drawable/bg_card_plain"
+    android:clipToOutline="true"
+    android:orientation="vertical"
+    android:paddingBottom="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="2dp">
+
+        <app.scoreline.ui.widget.CrestView
+            android:id="@+id/groupLogo"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginEnd="8dp"
+            android:importantForAccessibility="no" />
+
+        <TextView
+            android:id="@+id/groupTitle"
+            style="@style/Text.Overline"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1" />
+    </LinearLayout>
+</LinearLayout>

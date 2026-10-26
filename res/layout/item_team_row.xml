@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="32dp"
+    android:orientation="horizontal">
+
+    <app.scoreline.ui.widget.CrestView
+        android:id="@+id/crest"
+        android:layout_width="@dimen/crest"
+        android:layout_height="@dimen/crest"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/name"
+        style="@style/Text.Body"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/detail"
+        style="@style/Text.Caption"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:fontFeatureSettings="tnum"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/score"
+        style="@style/Text.Score"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="24dp"
+        android:gravity="end" />
+</LinearLayout>

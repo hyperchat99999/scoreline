@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.scoreline.tests">
+    <uses-sdk android:minSdkVersion="36" android:targetSdkVersion="36" />
+    <application android:label="Scoreline test suite" android:allowBackup="false" />
+    <instrumentation android:name="app.scoreline.live.SportsSimulation" android:targetPackage="app.scoreline" android:label="Scoreline sport simulations" />
+</manifest>

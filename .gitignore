@@ -1,0 +1,11 @@
+# Build outputs
+*.apk
+*.idsig
+
+# Signing key: build.sh makes a fresh one when it's missing. Never commit it.
+*.keystore
+*.jks
+
+# Python
+__pycache__/
+*.pyc
