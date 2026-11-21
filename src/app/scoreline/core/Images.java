@@ -56,13 +56,20 @@ public final class Images {
 
     /** Loads into {@code view} asynchronously with a short fade. Safe to call while views are recycled. */
     public void into(ImageView view, String url, int px) {
+        into(view, url, "", px);
+    }
+
+    /** A published light crest remains useful when a dark CDN variant is unavailable. */
+    public void into(ImageView view, String url, String fallbackUrl, int px) {
         String src = sized(url, px);
+        String fallback = sized(fallbackUrl, px);
         view.setTag(R.id.tag_image, src);
         if (src.isEmpty()) {
             view.setImageDrawable(null);
             return;
         }
         Bitmap cached = memory.get(src);
+        if (cached == null && !fallback.isEmpty()) cached = memory.get(fallback);
         if (cached != null) {
             view.setImageBitmap(cached);
             view.setAlpha(1f);
@@ -71,10 +78,12 @@ public final class Images {
         view.setImageDrawable(null);
         pool.execute(() -> {
             Bitmap bmp = decode(src);
+            if (bmp == null && !fallback.isEmpty() && !fallback.equals(src)) bmp = decode(fallback);
+            Bitmap loaded = bmp;
             main.post(() -> {
-                if (bmp == null || !src.equals(view.getTag(R.id.tag_image))) return;
+                if (loaded == null || !src.equals(view.getTag(R.id.tag_image))) return;
                 view.setAlpha(0f);
-                view.setImageBitmap(bmp);
+                view.setImageBitmap(loaded);
                 view.animate().alpha(1f).setDuration(160).start();
             });
         });
@@ -84,6 +93,24 @@ public final class Images {
     public Bitmap load(String url, int px) {
         String src = sized(url, px);
         return src.isEmpty() ? null : decode(src);
+    }
+
+    /** Nonblocking read for RemoteViews receivers. Disk/network work belongs in loadAsync. */
+    public Bitmap cached(String url, int px) {
+        String src = sized(url, px);
+        return src.isEmpty() ? null : memory.get(src);
+    }
+
+    /** Reuses the bounded crest executor and HTTP disk cache; completion runs on the main thread. */
+    public void loadAsync(String url, int px, java.util.function.Consumer<Bitmap> done) {
+        String src = sized(url, px);
+        if (src.isEmpty()) { main.post(() -> done.accept(null)); return; }
+        Bitmap cached = memory.get(src);
+        if (cached != null) { main.post(() -> done.accept(cached)); return; }
+        pool.execute(() -> {
+            Bitmap bitmap = decode(src);
+            main.post(() -> done.accept(bitmap));
+        });
     }
 
     private Bitmap decode(String src) {

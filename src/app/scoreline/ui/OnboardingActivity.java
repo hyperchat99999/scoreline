@@ -54,19 +54,32 @@ public final class OnboardingActivity extends BaseActivity {
         mockLeft = findViewById(R.id.mockLeft);
         mockCapsule = findViewById(R.id.mockCapsule);
         showDemo(0, false);
+        findViewById(R.id.mock).setContentDescription(getString(R.string.onboarding_example));
+        if (state != null && state.getBoolean("permissions")) {
+            intro.setVisibility(View.GONE);
+            perms.setVisibility(View.VISIBLE);
+        }
 
         findViewById(R.id.start).setOnClickListener(v -> startActivityForResult(DiscoverActivity.onboardingIntent(this), PICK));
+        findViewById(R.id.skipBrowse).setOnClickListener(v -> enterScores());
         findViewById(R.id.allowNotifications).setOnClickListener(v -> Notifications.ask(this, 2));
         findViewById(R.id.allowBackground).setOnClickListener(v -> {
             if (!Scheduler.unrestricted(this)) {
-                startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+                launch(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
             }
         });
-        findViewById(R.id.done).setOnClickListener(v -> {
-            app().store().setOnboarded();
-            startActivity(new Intent(this, HomeActivity.class));
-            finish();
-        });
+        findViewById(R.id.done).setOnClickListener(v -> enterScores());
+    }
+
+    private void enterScores() {
+        app().store().setOnboarded();
+        startActivity(new Intent(this, HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
+        finish();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state) {
+        state.putBoolean("permissions", perms.getVisibility() == View.VISIBLE);
+        super.onSaveInstanceState(state);
     }
 
     @Override

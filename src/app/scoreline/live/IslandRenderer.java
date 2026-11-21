@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import app.scoreline.R;
+import app.scoreline.widgets.SportsWidgetProvider;
 import app.scoreline.core.Ui;
 import app.scoreline.data.Espn;
 import app.scoreline.model.Match;
@@ -75,9 +76,10 @@ final class IslandRenderer {
     /**
      * @param flash  a moment to announce in the expanded capsule, or null.
      * @param moment use the island's expanded layout (icon, text, coloured capsule) for this post.
+     * @param swap   for the side island: makes this the main island. Null for the main island.
      */
     static Notification build(Context c, Match m, String focusId, Art art, Flash flash, boolean moment,
-                              PendingIntent open, PendingIntent hide) {
+                              PendingIntent open, PendingIntent hide, PendingIntent swap) {
         Content content = content(c, m, focusId, flash);
         Timeline t = Timeline.of(m);
 
@@ -106,16 +108,18 @@ final class IslandRenderer {
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
-                // Leads the app's one group, so Android doesn't wrap it in an automatic bundle (which
-                // the island answers by dropping its card).
-                .setGroup(GROUP)
-                .setGroupSummary(true)
+                // No group, and above all not a group summary: Android 17 never promotes a summary to a
+                // Live Update, and the island on newer skins only takes promoted notifications.
                 .setContentIntent(open)
                 .setDeleteIntent(hide)
                 .addAction(new Notification.Action.Builder(
                         Icon.createWithResource(c, R.drawable.ic_close), c.getString(R.string.act_stop), hide).build())
                 .setLargeIcon(content.large != null ? content.large : art.matchup)
                 .addExtras(extras);
+        if (swap != null) {
+            b.addAction(new Notification.Action.Builder(
+                    Icon.createWithResource(c, R.drawable.ic_island_on), c.getString(R.string.act_swap), swap).build());
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
             LiveUpdate.apply(b, t, content.color, m.isLive(), content.chip);
         } else {
@@ -128,7 +132,15 @@ final class IslandRenderer {
     }
 
     /**
-     * A followed match that's on while another holds the island. Deliberately not a progress or
+     * Takes a built island notification out of the island for one post: without the Live Update
+     * request Android doesn't promote it, and the island drops it.
+     */
+    static void leaveIsland(Notification n) {
+        n.extras.putBoolean(REQUEST_PROMOTED, false);
+    }
+
+    /**
+     * A followed match that's on while two others hold the island. Deliberately not a progress or
      * promoted notification, so the island leaves it in the shade instead of fighting for the island.
      */
     static Notification card(Context c, Match m, String focusId, Art art, PendingIntent open, PendingIntent hide,
@@ -223,7 +235,7 @@ final class IslandRenderer {
         }
         Match.Side us = m.sideOf(focusId);
         Match.Side them = m.opponentOf(focusId);
-        out.color = Ui.capsule(Ui.color(us.team.color, BRAND));
+        out.color = Ui.capsule(SportsWidgetProvider.teamColor(c, us.team, m.sport, true));
         out.capsuleColor = out.color;
 
         // One chip grammar for every head-to-head sport: before the start, the opponent and the
@@ -258,24 +270,24 @@ final class IslandRenderer {
                 break;
             case LIVE:
                 out.left = m.home.score + " – " + m.away.score;
-                out.capsule = flash != null ? flash.word : capsule(m);
-                if (flash != null) out.capsuleColor = flash.side == null ? GOAL : Ui.capsule(Ui.color(flash.side.team.color, GOAL));
+                out.capsule = flash != null ? shout(flash.word) : capsule(m);
+                if (flash != null) out.capsuleColor = flash.side == null ? GOAL : Ui.capsule(SportsWidgetProvider.teamColor(c, flash.side.team, m.sport, true));
                 out.title = home + "  " + m.home.score + " – " + m.away.score + "  " + away;
-                out.text = join(Timeline.of(m).phase(m), scorers(m));
+                out.text = m.sport == Sport.SOCCER ? join(Status.full(m), lastGoal(m)) : Timeline.of(m).phase(m);
                 break;
             default:
                 out.left = m.home.score + " – " + m.away.score;
                 out.capsule = Status.finished(m);
                 out.capsuleColor = FINISHED;
                 out.title = home + "  " + m.home.score + " – " + m.away.score + "  " + away;
-                out.text = join(m.status, scorers(m));
+                out.text = m.sport == Sport.SOCCER ? join(Status.finished(m), scorerNames(m)) : Status.finished(m);
         }
         return out;
     }
 
     private static void cricket(Context c, Match m, Match.Side us, Flash flash, Content out) {
         Match.Side batting = m.battingTeamId.equals(m.away.team.id) ? m.away : m.home;
-        out.title = innings(m.home) + "  ·  " + innings(m.away);
+        out.title = total(m.home) + "  ·  " + total(m.away);
         out.text = m.summary.isEmpty() ? join(m.title, m.leagueName) : m.summary;
         switch (m.state) {
             case PRE:
@@ -286,10 +298,10 @@ final class IslandRenderer {
                 break;
             case LIVE:
                 // Like every sport: where the match is first, then the detail (the chase equation).
-                out.text = join(Timeline.of(m).phase(m), m.summary.isEmpty() ? m.title : m.summary);
+                out.text = join(Timeline.of(m).phase(m), m.summary);
                 out.left = !m.involves(m.battingTeamId) ? "Live cricket" : batting.team.abbr + " " + batting.score;
-                out.capsule = flash != null ? flash.word : capsule(m);
-                out.color = Ui.capsule(Ui.color(batting.team.color, out.color));
+                out.capsule = flash != null ? shout(flash.word) : capsule(m);
+                out.color = Ui.capsule(SportsWidgetProvider.teamColor(c, batting.team, m.sport, true));
                 out.capsuleColor = flash != null ? WICKET : out.color;
                 break;
             default:
@@ -324,7 +336,7 @@ final class IslandRenderer {
                 return;
             case LIVE:
                 out.left = Espn.shortSession(m.session);
-                out.capsule = flash != null ? flash.word : capsule(m);
+                out.capsule = flash != null ? shout(flash.word) : capsule(m);
                 out.sub = Status.full(m);
                 out.text = Status.full(m);
                 break;
@@ -362,6 +374,15 @@ final class IslandRenderer {
     }
 
     /** {@code label + " " + value} when it fits the chip, else the value alone. */
+    /** The moment as the widget and app say it: "GOAL!", "WICKET!", "SIX!"; longer phrases stay plain. */
+    static String shout(String word) {
+        if (word == null || word.isEmpty() || word.endsWith("!")) return word;
+        switch (word) {
+            case "GOAL": case "WICKET": case "TOUCHDOWN": case "SIX": case "FOUR": return word + "!";
+            default: return word;
+        }
+    }
+
     private static String prefix(String label, String value) {
         if (label == null || label.isEmpty()) return value;
         String both = label + " " + value;
@@ -381,9 +402,43 @@ final class IslandRenderer {
         return minute == 0 ? hour + ampm : String.format(java.util.Locale.ROOT, "%d:%02d%s", hour, minute, ampm);
     }
 
-    private static String innings(Match.Side s) {
-        if (s.score.isEmpty()) return s.team.abbr;
-        return s.team.abbr + " " + s.score + (s.overs.isEmpty() ? "" : " (" + s.overs + ")");
+    /** "IND 184/3": the cricket title, without overs so both sides fit on one line. */
+    private static String total(Match.Side s) {
+        return s.score.isEmpty() ? s.team.abbr : s.team.abbr + " " + s.score;
+    }
+
+    /** The latest goal, the one people want under the score: "⚽ Jackson 54' (P)". */
+    static String lastGoal(Match m) {
+        Match.Moment last = null;
+        for (Match.Moment g : m.moments) if (g.isGoal()) last = g;
+        if (last == null) return "";
+        String tag = last.kind == Match.Moment.Kind.PENALTY ? " (P)" : last.kind == Match.Moment.Kind.OWN_GOAL ? " (OG)" : "";
+        return "⚽ " + surname(last.player) + " " + last.clock + tag;
+    }
+
+    /** Scorers by surname, home side then away, mirroring the title: "Palmer, Jackson – Son". */
+    static String scorerNames(Match m) {
+        String home = names(m, true), away = names(m, false);
+        if (home.isEmpty() && away.isEmpty()) return "";
+        return (home.isEmpty() ? "—" : home) + " – " + (away.isEmpty() ? "—" : away);
+    }
+
+    private static String names(Match m, boolean home) {
+        List<String> out = new ArrayList<>();
+        for (Match.Moment g : m.moments) {
+            if (!g.isGoal() || g.home != home) continue;
+            String name = surname(g.player) + (g.kind == Match.Moment.Kind.OWN_GOAL ? " (OG)" : "");
+            if (!out.contains(name)) out.add(name);
+        }
+        return String.join(", ", out);
+    }
+
+    /** "C. Palmer" -> "Palmer"; a single name stays as it is. */
+    private static String surname(String player) {
+        if (player == null) return "";
+        String p = player.trim();
+        int space = p.lastIndexOf(' ');
+        return space < 0 ? p : p.substring(space + 1);
     }
 
     /** "CHE Palmer 23', Jackson 71' · TOT Son 54'": each side's scorers under its own name. */
@@ -426,18 +481,18 @@ final class IslandRenderer {
         }
 
         /**
-         * Match time as a segmented bar (one segment per half, quarter or innings) with a knob where
-         * play is now, like a media scrubber. Nothing else goes on the bar: crests at its two ends read
-         * as a tug-of-war rather than a clock, and Android draws progress points as square notches that
-         * look like extra period breaks. Who scored and when is in the text above the bar.
+         * Match time as one smooth bar in the team's colour. Nothing else goes on it: crests at its two
+         * ends read as a tug-of-war rather than a clock, and progress points draw as square notches.
+         * Who scored and when is in the text above the bar.
          */
         private static Notification.ProgressStyle progress(Timeline t, int color, boolean live) {
             Notification.ProgressStyle p = new Notification.ProgressStyle()
                     .setStyledByProgress(true)
                     .setProgressIndeterminate(t.indeterminate);
-            for (int len : t.segments) p.addProgressSegment(new Notification.ProgressStyle.Segment(len).setColor(color));
-            if (live && !t.indeterminate) p.setProgressTrackerIcon(Icon.createWithBitmap(Badge.tracker(color)));
-            return p.setProgress(t.value);
+            // One continuous segment: period gaps read as clutter on a bar this thin, and a knob makes
+            // it look like a media scrubber. The filled part is the match played so far.
+            p.addProgressSegment(new Notification.ProgressStyle.Segment(Math.max(1, t.max)).setColor(color));
+            return p.setProgress(Math.min(t.value, Math.max(1, t.max)));
         }
     }
 }

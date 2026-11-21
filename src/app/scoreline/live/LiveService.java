@@ -31,6 +31,7 @@ import app.scoreline.model.Follow;
 import app.scoreline.model.Match;
 import app.scoreline.model.Sport;
 import app.scoreline.model.Team;
+import app.scoreline.widgets.SportsWidgetProvider;
 
 /**
  * Keeps the island current while followed matches are on. Runs as a foreground service whose
@@ -49,6 +50,8 @@ public final class LiveService extends Service {
     private static final long FEED_EVERY = 4 * 60_000;
     /** The island shows the expanded island layout for five seconds. */
     private static final long MOMENT = 5_000;
+    /** How long the island match stays out of the island while the island re-orders its two slots. */
+    private static final long RENEW = 700;
     private static final long FINAL_HOLD = 5 * 60_000;
 
     /** Re-evaluates what belongs in the island. Returns false if Android refused a background start. */
@@ -118,8 +121,11 @@ public final class LiveService extends Service {
     private int failedTicks;
     private volatile int foregroundId;
     private volatile int latestStartId;
-    /** The match that owns the island; the others are cards in the shade. */
+    /** The match that owns the island; the next one gets the side island, any other is a card in the shade. */
     private String islandKey;
+    private String sideKey;
+    /** The island and side matches as last rendered, to spot a new pair. */
+    private String shownPair;
     private final Runnable tick = this::tick;
     private final Runnable settle = () -> render(System.currentTimeMillis());
 
@@ -152,6 +158,7 @@ public final class LiveService extends Service {
                 store.hide(key);
                 drop(key);
             }
+            SportsWidgetProvider.updateAll(this);
             worker.removeCallbacks(tick);
             tick();
         });
@@ -212,6 +219,7 @@ public final class LiveService extends Service {
                 if (fresh != null) {
                     react(t, fresh, now);
                     t.match = fresh;
+                    app.widgets().publishMatch(fresh);
                 } else { t.match.updatesDelayed = true; }
             } catch (IOException ignored) {
                 t.match.updatesDelayed = true;
@@ -246,6 +254,13 @@ public final class LiveService extends Service {
             }
         }
         if (islandKey == null) islandKey = tracked.keySet().iterator().next();
+        sideKey = null;
+        for (Match m : wanted) {
+            if (!m.key().equals(islandKey) && tracked.containsKey(m.key())) {
+                sideKey = m.key();
+                break;
+            }
+        }
         render(now);
         failedTicks = delayed ? Math.min(4, failedTicks + 1) : 0;
         long interval = live ? (isScreenOn() ? TICK : TICK_SCREEN_OFF) : 120_000;
@@ -282,33 +297,55 @@ public final class LiveService extends Service {
     }
 
     /**
-     * The island match is the service's own notification; any other followed match that's on gets
-     * an ordinary card in the shade, with a button to swap it into the island.
+     * The island match is the service's own notification. The next match is a second live
+     * notification, which islands with two slots show as the small side island and other phones
+     * as a second Live Update. Any other followed match that's on gets an ordinary card in the
+     * shade. The side match and the cards have a button to swap them into the island.
+     *
+     * <p>Islands with two slots make the newer of the two notifications the big one. So the side
+     * match is posted first, and when the pair changes while the island match is already up, the
+     * island match is posted once as an ordinary notification (which takes it out of the island)
+     * and promoted again a moment later, to count as the newer one.
      */
     private void render(long now) {
         long settleAt = 0;
+        NotificationManager nm = getSystemService(NotificationManager.class);
         Tracked island = tracked.get(islandKey);
+        Tracked side = sideKey == null ? null : tracked.get(sideKey);
+        String pair = islandKey + "|" + sideKey;
+        boolean renew = side != null && island != null && island.inIsland && !pair.equals(shownPair);
+        shownPair = pair;
+        for (Tracked t : tracked.values()) {
+            if (t == island) continue;
+            String key = t.match.key();
+            if (t == side) {
+                boolean moment = now < t.momentUntil;
+                nm.notify(t.id, IslandRenderer.build(this, t.match, t.focusId, art(t), moment ? t.flash : null, moment,
+                        Notifications.openMatch(this, key), hideIntent(this, key), pinIntent(this, key)));
+                if (moment) settleAt = t.momentUntil;
+            } else {
+                nm.notify(t.id, IslandRenderer.card(this, t.match, t.focusId, art(t),
+                        Notifications.openMatch(this, key), hideIntent(this, key), pinIntent(this, key)));
+            }
+        }
         if (island != null) {
             String key = island.match.key();
             if (!island.inIsland && island.momentUntil < now) moment(island, null, now); // arrive expanded after a swap
             boolean moment = now < island.momentUntil;
             Notification n = IslandRenderer.build(this, island.match, island.focusId, art(island), moment ? island.flash : null, moment,
-                    Notifications.openMatch(this, key), hideIntent(this, key));
+                    Notifications.openMatch(this, key), hideIntent(this, key), null);
+            if (renew) {
+                IslandRenderer.leaveIsland(n);
+                settleAt = settleAt > 0 ? Math.min(settleAt, now + RENEW) : now + RENEW;
+            } else if (moment) {
+                settleAt = settleAt > 0 ? Math.min(settleAt, island.momentUntil) : island.momentUntil;
+            }
             startForeground(island.id, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
             if (foregroundId != island.id && !tracked.containsValue(byId(foregroundId))) cancel(foregroundId);
             foregroundId = island.id;
-            island.inIsland = true;
-            if (moment) settleAt = island.momentUntil;
         }
-        NotificationManager nm = getSystemService(NotificationManager.class);
-        for (Tracked t : tracked.values()) {
-            if (t == island) continue;
-            String key = t.match.key();
-            nm.notify(t.id, IslandRenderer.card(this, t.match, t.focusId, art(t),
-                    Notifications.openMatch(this, key), hideIntent(this, key), pinIntent(this, key)));
-            t.inIsland = false;
-        }
-        // Once the expanded layout times out, put the steady one back straight away.
+        for (Tracked t : tracked.values()) t.inIsland = t == island || t == side;
+        // Once the expanded layout times out (or the island match is due back), render straight away.
         worker.removeCallbacks(settle);
         if (settleAt > 0) worker.postDelayed(settle, settleAt - now + 300);
     }
@@ -359,10 +396,11 @@ public final class LiveService extends Service {
         } else {
             // The shade follows the system theme, so its crests do too.
             boolean night = Ui.isNight(this);
-            art.matchup = Badge.versus(images.load(m.home.team.crest(night), 96), images.load(m.away.team.crest(night), 96));
+            art.matchup = Badge.versus(images.load(m.home.team.crest(night), 96), images.load(m.away.team.crest(night), 96),
+                    SportsWidgetProvider.teamColor(this, m.home.team, m.sport, night), SportsWidgetProvider.teamColor(this, m.away.team, m.sport, night));
             if (m.sport == Sport.CRICKET) {
                 Bitmap crest = islandCrest(m.sideOf(subject).team);
-                art.focus = crest == null ? null : Badge.single(crest);
+                art.focus = crest == null ? null : Badge.single(crest, SportsWidgetProvider.teamColor(this, m.sideOf(subject).team, m.sport, true));
                 art.card = images.load(m.sideOf(subject).team.crest(night), 96);
             } else {
                 if (m.sport == Sport.SOCCER) {
@@ -371,7 +409,8 @@ public final class LiveService extends Service {
                     art.focus = Badge.pair(home, away);
                     complete = home != null && away != null;
                 } else {
-                    art.focus = Badge.single(islandCrest(m.sideOf(t.focusId).team));
+                    art.focus = Badge.single(islandCrest(m.sideOf(t.focusId).team),
+                            SportsWidgetProvider.teamColor(this, m.sideOf(t.focusId).team, m.sport, true));
                 }
                 art.card = images.load(m.sideOf(t.focusId).team.crest(night), 96);
             }

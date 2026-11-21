@@ -20,11 +20,26 @@ final class Badge {
     private static final int SIZE = 112;
 
     /** One crest or logo, centred with breathing room. */
-    static Bitmap single(Bitmap crest) {
+    static Bitmap single(Bitmap crest) { return single(crest, 0); }
+
+    /** One crest on a soft disc of its team colour, as in the app and widget (0: no disc). */
+    static Bitmap single(Bitmap crest, int color) {
         if (crest == null) return null;
         Bitmap out = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888);
-        draw(new Canvas(out), crest, 3, 3, SIZE - 6);
+        Canvas canvas = new Canvas(out);
+        if (color == 0) draw(canvas, crest, 3, 3, SIZE - 6);
+        else {
+            disc(canvas, SIZE / 2f, SIZE / 2f, SIZE / 2f - 1, color, 0x6B);
+            draw(canvas, crest, 19, 19, SIZE - 38);
+        }
         return out;
+    }
+
+    /** A team colour as a filled disc at the given strength. */
+    private static void disc(Canvas canvas, float cx, float cy, float r, int color, int alpha) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor((color & 0x00FFFFFF) | (alpha << 24));
+        canvas.drawCircle(cx, cy, r, paint);
     }
 
     /** Home upper-left, away lower-right, with a narrow silhouette separator on black. */
@@ -43,14 +58,20 @@ final class Badge {
      * The matchup for the notification shade: both crests side by side, home on the left as in the
      * title, on a transparent ground so it suits a light or dark shade.
      */
-    static Bitmap versus(Bitmap home, Bitmap away) {
-        if (home == null) return away == null ? null : single(away);
-        if (away == null) return single(home);
+    static Bitmap versus(Bitmap home, Bitmap away) { return versus(home, away, 0, 0); }
+
+    /** The same pair, each crest on a soft disc of its team colour (0: no disc). */
+    static Bitmap versus(Bitmap home, Bitmap away, int homeColor, int awayColor) {
+        if (home == null) return away == null ? null : single(away, awayColor);
+        if (away == null) return single(home, homeColor);
         int size = 144;
         Bitmap out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(out);
-        draw(canvas, home, 2, 38, 66, 68);
-        draw(canvas, away, 76, 38, 66, 68);
+        if (homeColor != 0) disc(canvas, 36, 72, 34, homeColor, 0x5C);
+        if (awayColor != 0) disc(canvas, 108, 72, 34, awayColor, 0x5C);
+        float inset = homeColor != 0 || awayColor != 0 ? 12 : 0;
+        draw(canvas, home, 2 + inset, 38 + inset, 66 - inset * 2, 68 - inset * 2);
+        draw(canvas, away, 76 + inset, 38 + inset, 66 - inset * 2, 68 - inset * 2);
         return out;
     }
 

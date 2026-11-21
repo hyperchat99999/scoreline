@@ -3,6 +3,8 @@ package app.scoreline.ui;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
@@ -12,6 +14,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import app.scoreline.core.Ui;
 
 import java.io.IOException;
 import java.text.Normalizer;
@@ -48,20 +52,42 @@ public final class DiscoverActivity extends BaseActivity {
     private final Map<String, Follow> index = new LinkedHashMap<>();
     private int indexPending;
     private ExecutorService indexer;
+    private int indexFailed;
+    private final Handler searchHandler = new Handler(Looper.getMainLooper());
+    private final Runnable renderSearch = this::render;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_discover);
         onboarding = getIntent().getBooleanExtra(EXTRA_ONBOARDING, false);
+        if (state != null) sport = Sport.of(state.getString("sport"));
         list = findViewById(R.id.list);
         sports = findViewById(R.id.sports);
         query = findViewById(R.id.query);
         next = findViewById(R.id.next);
         View bottom = findViewById(R.id.bottom);
-        applyInsets(findViewById(R.id.root), findViewById(R.id.top), onboarding ? bottom : findViewById(R.id.scroll));
+        View navigation = findViewById(R.id.bottomNavigation);
+        navigation.setVisibility(onboarding ? View.GONE : View.VISIBLE);
+        if (!onboarding) Navigation.bind(this, (LinearLayout) navigation, "explore");
+        applyInsets(findViewById(R.id.root), findViewById(R.id.top), onboarding ? bottom : navigation);
+        if (!onboarding) ((TextView) findViewById(R.id.heading)).setText(R.string.explore);
 
         findViewById(R.id.back).setOnClickListener(v -> finish());
+        if (!onboarding) {
+            // As a tab, Explore gets the same big heading and indent as Scores and Following.
+            findViewById(R.id.back).setVisibility(View.GONE);
+            TextView heading = findViewById(R.id.heading);
+            heading.setTextAppearance(R.style.Text_Display);
+            android.view.ViewGroup.MarginLayoutParams lp = (android.view.ViewGroup.MarginLayoutParams) heading.getLayoutParams();
+            lp.setMarginStart(Ui.dp(this, 16));
+            heading.setLayoutParams(lp);
+            View row = (View) heading.getParent();
+            android.view.ViewGroup.LayoutParams rowLp = row.getLayoutParams();
+            rowLp.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+            row.setLayoutParams(rowLp);
+            row.setPadding(row.getPaddingLeft(), Ui.dp(this, 28), row.getPaddingRight(), Ui.dp(this, 8));
+        }
         if (onboarding) {
             ((TextView) findViewById(R.id.heading)).setText(R.string.pick_title);
             findViewById(R.id.intro).setVisibility(View.VISIBLE);
@@ -81,7 +107,8 @@ public final class DiscoverActivity extends BaseActivity {
             @Override public void afterTextChanged(Editable s) {
                 clear.setVisibility(s.length() > 0 ? View.VISIBLE : View.GONE);
                 if (s.length() > 0) buildIndex();
-                render();
+                searchHandler.removeCallbacks(renderSearch);
+                searchHandler.postDelayed(renderSearch, 180);
             }
         });
         query.setOnEditorActionListener((v, action, e) -> {
@@ -100,6 +127,7 @@ public final class DiscoverActivity extends BaseActivity {
 
     @Override
     protected void onDestroy() {
+        searchHandler.removeCallbacksAndMessages(null);
         if (indexer != null) indexer.shutdownNow();
         super.onDestroy();
     }
@@ -110,6 +138,11 @@ public final class DiscoverActivity extends BaseActivity {
         // Follow state may have changed on a competition page.
         render();
         updateNext();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state) {
+        state.putString("sport", sport.path);
+        super.onSaveInstanceState(state);
     }
 
     // ---- Rendering -----------------------------------------------------------------------------
@@ -124,6 +157,7 @@ public final class DiscoverActivity extends BaseActivity {
             chip.setBackgroundResource(on ? R.drawable.bg_chip_selected : R.drawable.bg_chip);
             chip.setTextColor(getColor(on ? R.color.on_primary_container : R.color.on_surface));
             chip.setSelected(on);
+            Views.sportIcon(chip, s, on);
             chip.setOnClickListener(v -> {
                 sport = s;
                 if (query.length() > 0) query.setText("");
@@ -156,7 +190,7 @@ public final class DiscoverActivity extends BaseActivity {
         if (!comps.isEmpty()) {
             list.addView(FollowRows.section(inflater, list, getString(R.string.competitions)));
             for (Catalog.Competition c : comps) {
-                Runnable open = c.browsable ? () -> startActivity(CompetitionActivity.intent(this, c)) : null;
+                Runnable open = () -> startActivity(CompetitionActivity.intent(this, c));
                 list.addView(FollowRows.row(inflater, list, app(), c.follow(), null, open, this::updateNext));
             }
         }
@@ -166,7 +200,7 @@ public final class DiscoverActivity extends BaseActivity {
         List<View> rows = new ArrayList<>();
         for (Catalog.Competition c : Catalog.COMPETITIONS) {
             if (!normalise(c.name).contains(q)) continue;
-            Runnable open = c.browsable ? () -> startActivity(CompetitionActivity.intent(this, c)) : null;
+            Runnable open = () -> startActivity(CompetitionActivity.intent(this, c));
             rows.add(FollowRows.row(inflater, list, app(), c.follow(), getString(c.sport.label), open, this::updateNext));
         }
         List<Follow> teams;
@@ -185,9 +219,25 @@ public final class DiscoverActivity extends BaseActivity {
                     ? getString(R.string.loading) : getString(R.string.no_results, query.getText().toString().trim()));
             none.setTextColor(getColor(R.color.on_surface_variant));
             list.addView(none);
+            if (indexPending == 0 && indexFailed > 0) searchStatus(inflater);
             return;
         }
         for (View r : rows) list.addView(r);
+        searchStatus(inflater);
+    }
+
+    private void searchStatus(LayoutInflater inflater) {
+        if (indexPending == 0 && indexFailed == 0) return;
+        TextView status = (TextView) FollowRows.section(inflater, list, getString(indexPending > 0 ? R.string.index_loading : R.string.search_partial));
+        status.setMinHeight(app.scoreline.core.Ui.dp(this, 48));
+        if (indexPending == 0) status.setOnClickListener(v -> {
+            if (indexer != null) indexer.shutdownNow();
+            indexer = null;
+            indexFailed = 0;
+            buildIndex();
+            render();
+        });
+        list.addView(status);
     }
 
     // ---- Search index --------------------------------------------------------------------------
@@ -201,10 +251,12 @@ public final class DiscoverActivity extends BaseActivity {
             indexPending++;
             indexer.execute(() -> {
                 List<Team> teams;
+                boolean failed = false;
                 try {
                     teams = app().espn().teams(c.sport, c.league);
-                } catch (IOException e) {
+                } catch (IOException | RuntimeException e) {
                     teams = new ArrayList<>();
+                    failed = true;
                 }
                 synchronized (index) {
                     for (Team t : teams) {
@@ -212,9 +264,15 @@ public final class DiscoverActivity extends BaseActivity {
                         index.putIfAbsent(f.key(), f);
                     }
                 }
+                boolean loadFailed = failed;
                 runOnUiThread(() -> {
+                    if (isDestroyed() || isFinishing()) return;
                     indexPending--;
-                    if (query.length() > 0) render();
+                    if (loadFailed) indexFailed++;
+                    if (query.length() > 0) {
+                        searchHandler.removeCallbacks(renderSearch);
+                        searchHandler.postDelayed(renderSearch, 150);
+                    }
                 });
             });
         }

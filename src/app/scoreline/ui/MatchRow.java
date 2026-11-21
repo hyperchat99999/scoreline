@@ -33,6 +33,7 @@ final class MatchRow {
     private final TextView awayName;
     private final TextView awayScore;
     private final ImageButton island;
+    private final View rule;
 
     MatchRow(LayoutInflater inflater, ViewGroup parent) {
         root = inflater.inflate(R.layout.item_match_row, parent, false);
@@ -45,6 +46,7 @@ final class MatchRow {
         awayName = root.findViewById(R.id.awayName);
         awayScore = root.findViewById(R.id.awayScore);
         island = root.findViewById(R.id.island);
+        rule = root.findViewById(R.id.rule);
     }
 
     void bind(App app, Match m, MatchCard.Actions actions) {
@@ -86,9 +88,20 @@ final class MatchRow {
     private void bindWhen(Context c, Match m) {
         int strong = c.getColor(R.color.on_surface);
         int weak = c.getColor(R.color.on_surface_variant);
-        if (m.state == Match.State.PRE) {
+        rule.setBackgroundTintList(m.isLive() ? android.content.res.ColorStateList.valueOf(c.getColor(R.color.live)) : null);
+        if (m.isLive()) {
+            when.setText(Status.full(m));
+            when.setTextColor(c.getColor(R.color.live));
+            whenDetail.setText(R.string.live);
+            boolean night = Ui.isNight(c);
+            root.setBackground(Views.liveCard(c,
+                    m.home == null ? strong : app.scoreline.widgets.SportsWidgetProvider.teamColor(c, m.home.team, m.sport, night),
+                    m.away == null ? strong : app.scoreline.widgets.SportsWidgetProvider.teamColor(c, m.away.team, m.sport, night)));
+        } else if (m.state == Match.State.PRE) {
             String t = Ui.time(c, m.start);
-            int space = DateFormat.is24HourFormat(c) ? -1 : t.lastIndexOf(' ');
+            // Android 14+ puts a narrow no-break space (U+202F) before "pm", not a plain space.
+            int space = DateFormat.is24HourFormat(c) ? -1
+                    : Math.max(t.lastIndexOf(' '), Math.max(t.lastIndexOf(' '), t.lastIndexOf(' ')));
             when.setText(space < 0 ? t : t.substring(0, space));
             whenDetail.setText(space < 0 ? "" : t.substring(space + 1));
             when.setTextColor(strong);
@@ -111,6 +124,8 @@ final class MatchRow {
         name.setTypeface(Typeface.create(side.winner ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
         score.setText(m.state == Match.State.PRE ? "" : side.score);
         score.setTextColor(color);
+        // The winning score reads heavier, like a results board; the loser's steps back.
+        score.setTypeface(Typeface.create("sans-serif-condensed", lost ? Typeface.NORMAL : Typeface.BOLD));
         score.setVisibility(m.sport == Sport.CRICKET && side.score.isEmpty() ? View.GONE : View.VISIBLE);
     }
 }

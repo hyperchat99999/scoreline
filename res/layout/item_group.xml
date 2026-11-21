@@ -13,14 +13,17 @@
     android:paddingBottom="4dp">
 
     <LinearLayout
+        android:id="@+id/groupHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
+        android:baselineAligned="false"
+        android:minHeight="48dp"
         android:orientation="horizontal"
         android:paddingStart="16dp"
-        android:paddingTop="14dp"
+        android:paddingTop="0dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="2dp">
+        android:paddingBottom="0dp">
 
         <app.scoreline.ui.widget.CrestView
             android:id="@+id/groupLogo"

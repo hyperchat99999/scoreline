@@ -11,6 +11,7 @@ import app.scoreline.live.Notifications;
 import app.scoreline.live.Scheduler;
 import app.scoreline.live.Tracker;
 import app.scoreline.model.Match;
+import app.scoreline.widgets.SportsWidgetProvider;
 
 /** The "Island" button's logic, shared by match cards and the match screen. */
 final class IslandToggle {
@@ -44,6 +45,7 @@ final class IslandToggle {
         Store store = app.store();
         if (isOn(app, m)) {
             store.hide(m.key());
+            SportsWidgetProvider.updateAll(a);
             LiveService.sync(a);
             a.toast(R.string.island_removed);
             return;
@@ -53,6 +55,7 @@ final class IslandToggle {
             return;
         }
         store.pin(m);
+        app.feed().includePinned(m);
         if (isActive(m)) {
             if (LiveService.pin(a, m.key())) a.toast(R.string.island_added);
             else a.toast(R.string.island_failed);

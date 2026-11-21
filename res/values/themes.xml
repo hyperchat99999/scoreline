@@ -19,6 +19,14 @@
         <item name="android:windowLayoutInDisplayCutoutMode">always</item>
         <item name="android:windowSplashScreenBackground">@color/icon_bg</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_fg</item>
+        <item name="android:windowAnimationStyle">@style/ScreenMotion</item>
+    </style>
+    <!-- Screens slide a short way sideways and fade, rather than the platform's default zoom. -->
+    <style name="ScreenMotion" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/screen_open_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/screen_open_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/screen_close_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/screen_close_exit</item>
     </style>
     <style name="Theme.Scoreline" parent="Theme.Scoreline.Base" />
 

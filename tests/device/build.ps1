@@ -1,10 +1,16 @@
+param([string]$Sdk = '', [string]$TargetBuild = '')
 $ErrorActionPreference = 'Stop'
 $project = (Resolve-Path "$PSScriptRoot\..\..").Path
 $jdkPath = (Get-ChildItem 'C:\Program Files\Microsoft' -Directory -Filter 'jdk-21*' | Select-Object -First 1).FullName
-$sdk = "$env:TEMP\adsb\sdk"
+if (!$Sdk) { $Sdk = if ($env:SDK) { $env:SDK } elseif (Test-Path "$project\.tools\sdk\android-36\android.jar") { "$project\.tools\sdk" } else { "$env:TEMP\adsb\sdk" } }
 $bt = "$sdk\android-16"
 $jar = "$sdk\android-36\android.jar"
-$targetBuild = (Get-ChildItem "$env:TEMP\adsb\build-scoreline" -Directory -Filter 'run-*' | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+if (!$TargetBuild) {
+    $TargetBuild = (@("$project\.tools\build", "$env:TEMP\adsb\build-scoreline") | Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object {
+        Get-ChildItem -LiteralPath $_ -Directory -Filter 'run-*'
+    } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+}
+if (!(Test-Path -LiteralPath "$TargetBuild\classes\app\scoreline\App.class")) { throw 'Build the app first, or supply -TargetBuild.' }
 $out = Join-Path $env:TEMP ('scoreline-device-tests-' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
 New-Item -ItemType Directory -Force "$out\classes","$out\dex" | Out-Null
 function Check-Exit { if ($LASTEXITCODE -ne 0) { throw "Build tool failed: $LASTEXITCODE" } }

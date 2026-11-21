@@ -8,6 +8,9 @@ unset MSYS_NO_PATHCONV
 
 JDK=$(ls -d "/c/Program Files/Microsoft/jdk-21"* | head -1)
 SDK=${SDK:-$HOME/AppData/Local/Temp/adsb/sdk}
+if [ ! -f "$SDK/android-36/android.jar" ] && [ -f .tools/sdk/android-36/android.jar ]; then
+    SDK="$(pwd)/.tools/sdk"
+fi
 BT="$SDK/android-16"            # build-tools r36 unzips to this folder name
 AJ="$SDK/android-36/android.jar"
 BASE=${OUT:-$HOME/AppData/Local/Temp/adsb/build-scoreline}
@@ -28,13 +31,15 @@ echo "1/6 resources"
     -o "$OUT/unsigned.apk" "$OUT/res.zip"
 
 echo "2/6 compile"
+mapfile -d '' SOURCES < <(find src -name '*.java' -print0)
 "$JDK/bin/javac" -Xlint:all,-options,-serial -encoding UTF-8 -source 17 -target 17 \
     -classpath "$AJ" -d "$OUT/classes" \
-    $(find src -name '*.java') "$OUT/gen/app/scoreline/R.java"
+    "${SOURCES[@]}" "$OUT/gen/app/scoreline/R.java"
 
 echo "3/6 dex"
+mapfile -d '' CLASSES < <(find "$OUT/classes" -name '*.class' -print0)
 "$JDK/bin/java" -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 --release --min-api 31 --lib "$AJ" \
-    --output "$OUT/dex" $(find "$OUT/classes" -name '*.class')
+    --output "$OUT/dex" "${CLASSES[@]}"
 
 echo "4/6 package"
 python -I -c "import sys, zipfile; z = zipfile.ZipFile(sys.argv[1], 'a', zipfile.ZIP_DEFLATED); z.write(sys.argv[2], 'classes.dex'); z.close()" \

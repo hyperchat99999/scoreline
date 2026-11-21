@@ -115,7 +115,7 @@
             android:id="@+id/island"
             style="@style/Text.Label"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="48dp"
             android:background="@drawable/bg_btn_outline"
             android:drawableStart="@drawable/ic_island"
             android:drawablePadding="6dp"

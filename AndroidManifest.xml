@@ -35,6 +35,7 @@
             android:name=".ui.DiscoverActivity"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.CompetitionActivity" />
+        <activity android:name=".ui.TeamActivity" />
         <activity
             android:name=".ui.MatchActivity"
             android:parentActivityName=".ui.HomeActivity" />
@@ -53,6 +54,20 @@
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
+        <receiver
+            android:name=".widgets.SportsWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/sports_widget" />
+        </receiver>
+        <receiver
+            android:name=".widgets.ScoreTileProvider"
+            android:exported="false"
+            android:label="@string/widget_tile_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/score_tile_widget" />
+        </receiver>
         <receiver
             android:name=".live.Receiver"
             android:exported="false">

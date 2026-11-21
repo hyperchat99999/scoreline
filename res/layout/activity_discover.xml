@@ -26,7 +26,7 @@
                 android:layout_width="@dimen/touch"
                 android:layout_height="@dimen/touch"
                 android:background="@drawable/bg_row"
-                android:contentDescription="@android:string/cancel"
+                android:contentDescription="@string/hub_back"
                 android:src="@drawable/ic_arrow_back" />
 
             <TextView
@@ -87,10 +87,10 @@
 
             <ImageButton
                 android:id="@+id/clear"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="@drawable/bg_row"
-                android:contentDescription="@android:string/cancel"
+                android:contentDescription="@string/clear_search"
                 android:src="@drawable/ic_close"
                 android:visibility="gone" />
         </LinearLayout>
@@ -151,4 +151,6 @@
             android:textColor="@color/on_primary"
             android:textSize="16sp" />
     </FrameLayout>
+    <LinearLayout android:id="@+id/bottomNavigation" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:background="@color/surface" android:padding="6dp" />
 </LinearLayout>

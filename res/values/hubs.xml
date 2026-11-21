@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hub_back">Back</string>
+    <string name="hub_competition">Competition</string>
+    <string name="hub_team">Team</string>
+    <string name="hub_refresh">Refresh</string>
+    <string name="hub_refreshing">Refreshing…</string>
+    <string name="hub_retry">Retry</string>
+    <string name="hub_fixtures">Fixtures / results</string>
+    <string name="hub_sessions">Sessions</string>
+    <string name="hub_table">Standings</string>
+    <string name="hub_teams">Teams</string>
+    <string name="hub_previous_date">Previous day</string>
+    <string name="hub_next_date">Next day</string>
+    <string name="hub_choose_date">Choose date: %1$s</string>
+    <string name="hub_no_matches">No fixtures or results for this date.</string>
+    <string name="hub_no_teams">No teams are listed for this competition.</string>
+    <string name="hub_no_standings">Standings have not been published for this competition.</string>
+    <string name="hub_load_error">Couldn\'t load this section. Check your connection and retry.</string>
+    <string name="hub_partial">Some data couldn\'t refresh. Showing the available data.</string>
+    <string name="hub_stale">Showing saved data. It may be out of date.</string>
+    <string name="hub_table_unsupported">ESPN does not provide a standings table for this competition.</string>
+    <string name="hub_cricket_table_unsupported">A series standings table is not available from the cricket feed.</string>
+    <string name="hub_racing_table_unsupported">Season standings are not available from this feed. Open a session for its running order.</string>
+    <string name="hub_teams_unsupported">A team list is not available for this competition.</string>
+    <string name="hub_racing_teams_unsupported">Formula 1 is organized by sessions. Browse fixtures to open a race, qualifying or practice session.</string>
+    <string name="hub_cricket_teams">Cricket team lists are limited to the international sides available in Explore.</string>
+    <string name="hub_cricket_schedule">Cricket matches come from available series and the current ticker. A complete historical team schedule is not available.</string>
+    <string name="hub_team_schedule_unsupported">A team schedule is not available for this sport.</string>
+    <string name="hub_no_upcoming">No upcoming fixtures are available.</string>
+    <string name="hub_no_recent">No recent results are available.</string>
+    <string name="hub_upcoming">Upcoming fixtures</string>
+    <string name="hub_recent">Recent results</string>
+    <string name="hub_scheduled">Fixtures and results</string>
+    <string name="hub_rank">Rank</string>
+    <string name="hub_follow_team">Follow %1$s</string>
+    <string name="hub_unfollow_team">Unfollow %1$s</string>
+    <string name="hub_open_competition">Open %1$s</string>
+    <string name="hub_missing_team">This team link is incomplete. Go back and open the team again.</string>
+    <string name="hub_missing_competition">This competition link is incomplete. Go back and open the competition again.</string>
+    <string name="hub_source">Data provided by ESPN. Coverage and update times vary by competition.</string>
+</resources>

@@ -141,7 +141,7 @@ public final class SportsSimulation extends Instrumentation {
         canvas.drawText("T",37,78,p);a.focus=logo;a.card=logo;return a;
     }
     private Notification notification(Match m,boolean moment) {
-        return IslandRenderer.build(getTargetContext(),m,"home",art(m.sport),null,moment,noop(),noop());
+        return IslandRenderer.build(getTargetContext(),m,"home",art(m.sport),null,moment,noop(),noop(),null);
     }
     private String chip(Notification n) {return n.extras.getString("android.shortCriticalText","");}
     private void renderTests() {
@@ -152,9 +152,16 @@ public final class SportsSimulation extends Instrumentation {
                 check(n.getSmallIcon()!=null,sport+" icon "+state);
                 check(!n.extras.getCharSequence(Notification.EXTRA_TITLE,"").toString().isEmpty(),sport+" title "+state);
                 check(n.extras.getString(Notification.EXTRA_TEMPLATE,"").contains("ProgressStyle"),sport+" progress template");
+                // What Android needs before it promotes a Live Update (and the island takes it).
+                check((n.flags&Notification.FLAG_GROUP_SUMMARY)==0 && (n.flags&Notification.FLAG_ONGOING_EVENT)!=0
+                        && n.extras.getBoolean("android.requestPromotedOngoing") && !n.extras.getBoolean(Notification.EXTRA_COLORIZED),sport+" promotable "+state);
                 if(state==Match.State.OFF) check(chip(n).toLowerCase(Locale.ROOT).contains("cancel"),sport+" cancelled chip is not live/final");
                 Notification card=IslandRenderer.card(getTargetContext(),m,"home",art(sport),noop(),noop(),noop());
                 check(!card.extras.getString(Notification.EXTRA_TEMPLATE,"").contains("ProgressStyle"),sport+" shade card cannot steal island");
+                Notification side=IslandRenderer.build(getTargetContext(),m,"home",art(sport),null,rich,noop(),noop(),noop());
+                check(side.actions!=null && side.actions.length==2 && n.actions.length==1,sport+" side island can swap, main cannot");
+                IslandRenderer.leaveIsland(side);
+                check(!side.extras.getBoolean("android.requestPromotedOngoing"),sport+" leaves the island for a re-post");
             }
         }
         Match nba=fixture(Sport.BASKETBALL);
@@ -185,12 +192,24 @@ public final class SportsSimulation extends Instrumentation {
     /**
      * {@code -e hold SOCCER}: posts that sport's live notification and leaves it up, so the shade
      * and status bar can be inspected by hand. The next hold replaces it; {@code -e hold OFF} clears it.
+     * {@code -e second CRICKET} adds a second live notification alongside, to see how many islands show.
      */
     private void hold(Sport sport) {
         NotificationManager nm=getTargetContext().getSystemService(NotificationManager.class);
         runOnMainSync(() -> getTargetContext().stopService(new Intent(getTargetContext(), LiveService.class)));
         nm.cancel(TEST_ID);
+        nm.cancel(TEST_ID+1);
         Bundle result=new Bundle();
+        String second=args.getString("second");
+        // -e late true: the second match turns up after the first, as when it kicks off later. The
+        // first is then taken out of the island and put back, the way LiveService keeps it the big one.
+        boolean late="true".equals(args.getString("late"));
+        Notification sideN=null;
+        if (sport != null && second != null) {
+            sideN=notification(fixture(Sport.valueOf(second)),false);
+            sideN.extras.putCharSequence(Notification.EXTRA_TITLE,"TEST 2 · "+sideN.extras.getCharSequence(Notification.EXTRA_TITLE));
+            if(!late) nm.notify(TEST_ID+1,sideN);
+        }
         if (sport != null) {
             Match m=fixture(sport);
             if (sport==Sport.SOCCER) {
@@ -201,7 +220,30 @@ public final class SportsSimulation extends Instrumentation {
             Notification n=notification(m,false);
             n.extras.putCharSequence(Notification.EXTRA_TITLE,"TEST · "+n.extras.getCharSequence(Notification.EXTRA_TITLE));
             nm.notify(TEST_ID,n);
-            result.putString("stream","Holding "+sport+": "+n.extras.getString("android.shortCriticalText","")+System.lineSeparator());
+            if(late && sideN!=null) {
+                SystemClock.sleep(3000);
+                nm.notify(TEST_ID+1,sideN);
+                SystemClock.sleep(1000);
+                Notification off=notification(m,false);
+                off.extras.putCharSequence(Notification.EXTRA_TITLE,n.extras.getCharSequence(Notification.EXTRA_TITLE));
+                IslandRenderer.leaveIsland(off);
+                nm.notify(TEST_ID,off);
+                SystemClock.sleep(700);
+                nm.notify(TEST_ID,n);
+            }
+            StringBuilder out=new StringBuilder("Holding "+sport+": "+n.extras.getString("android.shortCriticalText","")+System.lineSeparator());
+            // What Android made of them: 0x40000 is FLAG_PROMOTED_ONGOING, the Live Update the island needs.
+            SystemClock.sleep(1500);
+            for(android.service.notification.StatusBarNotification s:nm.getActiveNotifications()) {
+                if(s.getId()!=TEST_ID && s.getId()!=TEST_ID+1) continue;
+                out.append(s.getId()).append(" flags=0x").append(Integer.toHexString(s.getNotification().flags))
+                        .append(" promoted=").append((s.getNotification().flags&0x40000)!=0)
+                        .append(" group=").append(s.getGroupKey()).append(System.lineSeparator());
+            }
+            result.putString("stream",out.toString());
+            // -e wait 20: keep the process alive like the real live service, which owns the island.
+            String wait=args.getString("wait");
+            if(wait!=null) SystemClock.sleep(Long.parseLong(wait)*1000);
         }
         finish(Activity.RESULT_OK,result);
     }

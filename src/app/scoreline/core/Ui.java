@@ -75,6 +75,17 @@ public final class Ui {
         return c;
     }
 
+    /** Solid chart fills need contrast against their actual card, including secondary team colors. */
+    public static int chartColor(int color, int background) {
+        int toward = luminance(background) < .4 ? Color.WHITE : Color.BLACK;
+        for (int i = 0; i < 24; i++) {
+            double a = luminance(color), b = luminance(background);
+            if ((Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 3.2) break;
+            color = mix(color, toward, .12f);
+        }
+        return color;
+    }
+
     // ---- Time ----------------------------------------------------------------------------------
 
     public static String time(Context c, long ms) {

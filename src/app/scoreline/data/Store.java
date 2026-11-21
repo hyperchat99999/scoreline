@@ -17,6 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import app.scoreline.model.Follow;
 import app.scoreline.model.Match;
+import app.scoreline.model.MatchRef;
 
 /** The user's follows, preferences and per-match island choices, persisted in SharedPreferences. */
 public final class Store {
@@ -122,6 +123,13 @@ public final class Store {
         prefs.edit().putBoolean(ALERTS, on).apply();
     }
 
+    public String theme() { return prefs.getString("theme", "system"); }
+
+    public void setTheme(String theme) {
+        if ("system".equals(theme) || "light".equals(theme) || "dark".equals(theme))
+            prefs.edit().putString("theme", theme).apply();
+    }
+
     // ---- Island choices ------------------------------------------------------------------------
 
     public boolean isPinned(String matchKey) {
@@ -146,6 +154,7 @@ public final class Store {
         Set<String> set = new HashSet<>();
         for (Map.Entry<String, Long> e : map.entrySet()) set.add(e.getKey() + "|" + e.getValue());
         prefs.edit().putStringSet(PINNED, set).putLong("pin_time:" + match.key(), System.currentTimeMillis()).apply();
+        prefs.edit().putString("pin_ref:" + match.key(), MatchRef.from(match).encode()).apply();
     }
 
     public synchronized void pin(String matchKey) {
@@ -166,8 +175,22 @@ public final class Store {
     /** User removed this match from the island; don't bring it back automatically. */
     public synchronized void hide(String matchKey) {
         edit(PINNED, matchKey, false);
+        prefs.edit().remove("pin_ref:" + matchKey).apply();
         edit(HIDDEN, matchKey, true);
     }
+
+    /** Descriptors let browsing pins survive process death without creating a follow. */
+    public synchronized List<MatchRef> pinnedMatches() {
+        List<MatchRef> out = new ArrayList<>();
+        for (String key : choices(PINNED).keySet()) {
+            MatchRef ref = MatchRef.decode(prefs.getString("pin_ref:" + key, ""));
+            if (ref == null) ref = MatchRef.fromKey(key);
+            if (ref != null) out.add(ref);
+        }
+        return out;
+    }
+
+    public boolean hasPins() { return !choices(PINNED).isEmpty(); }
 
     /**
      * Whether a match should be in the island right now, ignoring timing: the user pinned it, or it

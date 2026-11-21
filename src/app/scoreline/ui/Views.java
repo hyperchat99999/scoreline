@@ -26,6 +26,23 @@ import app.scoreline.model.Status;
 final class Views {
     private Views() {}
 
+    static void sportIcon(TextView chip, Sport sport, boolean selected) {
+        int icon;
+        switch (sport) {
+            case CRICKET: icon = R.drawable.ic_sport_cricket; break;
+            case BASKETBALL: icon = R.drawable.ic_sport_basketball; break;
+            case RACING: icon = R.drawable.ic_sport_racing; break;
+            case FOOTBALL: icon = R.drawable.ic_sport_football; break;
+            case HOCKEY: icon = R.drawable.ic_sport_hockey; break;
+            case BASEBALL: icon = R.drawable.ic_sport_baseball; break;
+            default: icon = R.drawable.ic_sport_soccer;
+        }
+        Context context = chip.getContext();
+        chip.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted(context, icon,
+                context.getColor(selected ? R.color.on_primary_container : R.color.on_surface_variant)), null, null, null);
+        chip.setCompoundDrawablePadding(Ui.dp(context, 8));
+    }
+
     static void followButton(TextView b, boolean following) {
         Context c = b.getContext();
         b.setText(following ? R.string.following : R.string.follow);
@@ -113,9 +130,27 @@ final class Views {
         return new LayerDrawable(new Drawable[] {teams, fade});
     }
 
+    /** The same backdrop with the sport's mark bled off the top-right corner, faint, like a broadcast set. */
+    static Drawable heroBackdrop(Context c, int home, int away, int glyph) {
+        GradientDrawable teams = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[] {tint(c, home), tint(c, away)});
+        Drawable mark = tinted(c, glyph, c.getColor(R.color.on_surface));
+        mark.setAlpha(Ui.isNight(c) ? 20 : 16);
+        int bg = c.getColor(R.color.bg);
+        GradientDrawable fade = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] {bg & 0x00FFFFFF, bg & 0x00FFFFFF, bg});
+        LayerDrawable layers = new LayerDrawable(new Drawable[] {teams, mark, fade});
+        int size = Ui.dp(c, 260);
+        layers.setLayerSize(1, size, size);
+        layers.setLayerGravity(1, android.view.Gravity.END | android.view.Gravity.TOP);
+        layers.setLayerInsetEnd(1, -Ui.dp(c, 70));
+        layers.setLayerInsetTop(1, Ui.dp(c, 10));
+        return layers;
+    }
+
     /** A team colour faint enough to sit behind text: stronger at night, when colours read darker. */
     private static int tint(Context c, int color) {
-        int alpha = Ui.isNight(c) ? 0x47 : 0x2E;
+        int alpha = Ui.isNight(c) ? 0x52 : 0x38;
         return (alpha << 24) | (color & 0x00FFFFFF);
     }
 

@@ -64,6 +64,8 @@
                     android:textColor="#FFFFFF"
                     android:textSize="16sp" />
             </LinearLayout>
+            <TextView style="@style/Text.Caption" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal" android:gravity="center" android:paddingBottom="24dp" android:text="@string/onboarding_preview" />
         </FrameLayout>
 
         <TextView
@@ -94,6 +96,8 @@
             android:text="@string/get_started"
             android:textColor="@color/on_primary"
             android:textSize="16sp" />
+        <TextView android:id="@+id/skipBrowse" style="@style/Text.Label" android:layout_width="match_parent" android:layout_height="48dp"
+            android:gravity="center" android:background="@drawable/bg_row" android:text="@string/browse_scores" />
     </LinearLayout>
 
     <!-- Page 2: the two permissions that make the island work, each explained. -->
@@ -111,7 +115,7 @@
         <Space
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_weight="0.4" />
 
         <TextView
             style="@style/Text.Display"
@@ -162,7 +166,7 @@
                 android:id="@+id/allowNotifications"
                 style="@style/Text.Label"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="48dp"
                 android:layout_marginStart="12dp"
                 android:drawablePadding="4dp"
                 android:gravity="center"
@@ -205,7 +209,7 @@
                 android:id="@+id/allowBackground"
                 style="@style/Text.Label"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="48dp"
                 android:layout_marginStart="12dp"
                 android:drawablePadding="4dp"
                 android:gravity="center"

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="scores">Scores</string>
+    <string name="your_follows">Your teams and competitions</string>
+    <string name="swipe_stats">Swipe horizontally for more statistics →</string>
+    <string name="explore">Explore</string>
+    <string name="clear_search">Clear search</string>
+    <string name="refresh">Refresh</string>
+    <string name="refreshing">Refreshing…</string>
+    <string name="retry">Try again</string>
+    <string name="request_failed">Couldn\'t load data. Check your connection and try again.</string>
+    <string name="link_unavailable">No app is available to open this link.</string>
+    <string name="partial_scores">Some scores are unavailable. Showing the data we could load.</string>
+    <string name="stale_scores">Updates delayed. Showing saved scores.</string>
+    <string name="no_scores">No matches on this date</string>
+    <string name="no_live_scores">No live matches on this date</string>
+    <string name="scores_empty_body">Try another date, sport or competition.</string>
+    <string name="all_count">All · %1$d</string>
+    <string name="live_count">Live · %1$d</string>
+    <string name="previous_day">Previous day</string>
+    <string name="next_day">Next day</string>
+    <string name="choose_date">Choose date</string>
+    <string name="manage">Manage</string>
+    <string name="show_matches">Matches</string>
+    <string name="unfollow">Unfollow</string>
+    <string name="add_follows">Add teams and competitions</string>
+    <string name="match_loading">Loading match…</string>
+    <string name="match_missing">This match is unavailable from the provider.</string>
+    <string name="match_stats">Match statistics</string>
+    <!-- Before kick-off the provider sends each side's season totals, not numbers from this match. -->
+    <string name="season_stats">Season so far</string>
+    <string name="statistic">Statistic</string>
+    <string name="match_stats_empty">Additional match statistics are not available yet.</string>
+    <string name="details_failed">Match statistics couldn\'t load. Tap to retry.</string>
+    <string name="share_match">Share match</string>
+    <string name="search_partial">Some teams couldn\'t be loaded. Tap to retry.</string>
+    <string name="index_loading">Finding more teams…</string>
+    <string name="browse_scores">Browse scores</string>
+    <string name="theme">Appearance</string>
+    <string name="theme_system">Use device theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="notifications_on">Allowed. Tap to manage live score notifications.</string>
+    <string name="notifications_off">Disabled. Tap to enable live tracking.</string>
+    <string name="onboarding_preview">Live score preview · on supported phones</string>
+    <string name="onboarding_example">Example scores</string>
+    <string name="cricket_coverage">Cricket dates cover the series currently listed by ESPN.</string>
+    <string name="match_starts">Starts %1$s</string>
+    <string name="stat_rate">Conversion rate</string>
+    <string name="stat_count_yards">Count / yards</string>
+    <string name="stat_values_legend">Bars show each side’s share. Bold marks the better side: for fouls and cards, that’s fewer.</string>
+    <string name="stats_show_all">Show all %1$d stats</string>
+    <string name="stat_leads">%1$s ahead</string>
+    <string name="stat_tied">Level</string>
+    <string name="cricket_overs">%1$s ov</string>
+</resources>

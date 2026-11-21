@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 import app.scoreline.model.Follow;
 import app.scoreline.model.Match;
+import app.scoreline.model.MatchRef;
 import app.scoreline.model.Sport;
 
 /**
@@ -65,6 +66,10 @@ public final class Feed {
     private final Store store;
     private final ExecutorService pool = Executors.newFixedThreadPool(4);
     private volatile Snapshot last = Snapshot.EMPTY;
+    private final Object publication = new Object();
+    private volatile boolean pinsChanged;
+    private long pinRevision;
+    private volatile java.util.function.Consumer<Snapshot> listener;
 
     public Feed(Espn espn, Store store) {
         this.espn = espn;
@@ -75,19 +80,45 @@ public final class Feed {
         return last;
     }
 
+    public void setListener(java.util.function.Consumer<Snapshot> listener) { this.listener = listener; }
+
+    private void publish(Snapshot snapshot) {
+        java.util.function.Consumer<Snapshot> callback = listener;
+        if (callback != null) callback.accept(snapshot);
+    }
+
+    /** Make a newly pinned browse match immediately visible to the tracking pipeline. */
+    public void includePinned(Match match) {
+        synchronized (publication) {
+            List<Match> matches = new ArrayList<>(last.matches);
+            matches.removeIf(m -> m.key().equals(match.key()));
+            matches.add(match);
+            matches.sort(Comparator.comparingLong(m -> m.start));
+            last = new Snapshot(Collections.unmodifiableList(matches), last.updatedAt, last.offline);
+            pinRevision++;
+            pinsChanged = true;
+        }
+        publish(last);
+    }
+
     /**
      * Loads the timeline. {@code fresh} shortens cache ages for an explicit refresh. Blocking: call
      * from a worker thread.
      */
     public synchronized Snapshot load(boolean fresh) {
         if (Thread.currentThread().isInterrupted()) return last;
-        if (!fresh && System.currentTimeMillis() - last.updatedAt < 15_000) return last;
+        if (!fresh && !pinsChanged && System.currentTimeMillis() - last.updatedAt < 15_000) return last;
+        long revision;
+        synchronized (publication) { revision = pinRevision; }
         List<Follow> follows = store.follows();
         long now = System.currentTimeMillis();
-        espn.resetStale();
 
         Map<String, Callable<List<Match>>> sources = new LinkedHashMap<>();
         for (Follow f : follows) addSources(sources, f, fresh, now);
+        for (MatchRef ref : store.pinnedMatches()) sources.put("pin:" + ref.key(), () -> {
+            Match hit = espn.lookup(ref, fresh ? Espn.LIVE : Espn.SHORT);
+            return hit == null ? Collections.emptyList() : Collections.singletonList(hit);
+        });
         int[] failures = {0};
         List<Match> fetched = runAll(sources.values(), failures);
 
@@ -104,18 +135,32 @@ public final class Feed {
 
         Map<String, Match> byKey = new LinkedHashMap<>();
         for (Match m : fetched) {
-            if (m.start < now - PAST || m.start > now + FUTURE || !covered(follows, m)) continue;
+            if (!store.isPinned(m.key()) && (m.start < now - PAST || m.start > now + FUTURE || !covered(follows, m))) continue;
             Match prev = byKey.get(m.key());
             if (prev == null || rank(m) > rank(prev)) byKey.put(m.key(), m);
         }
         makeCurrent(byKey, now, fresh);
+        if (failures[0] > 0) for (Match previous : last.matches) {
+            if ((covered(follows, previous) || store.isPinned(previous.key())) && !byKey.containsKey(previous.key()))
+                byKey.put(previous.key(), previous);
+        }
 
         List<Match> list = trim(new ArrayList<>(byKey.values()), follows, now);
+        for (Match m : byKey.values()) if (store.isPinned(m.key()) && !list.contains(m)) list.add(m);
         list.sort(Comparator.comparingLong(m -> m.start));
-        boolean offline = espn.stale() || (failures[0] > 0 && fetched.isEmpty());
+        boolean offline = failures[0] > 0 || list.stream().anyMatch(match -> match.updatesDelayed);
         Snapshot s = new Snapshot(Collections.unmodifiableList(list), now, offline);
         if (Thread.currentThread().isInterrupted() || !follows.equals(store.follows())) return last;
-        last = s;
+        synchronized (publication) {
+            if (revision != pinRevision) {
+                List<Match> merged = new ArrayList<>(s.matches);
+                for (Match current : last.matches) if (store.isPinned(current.key()) && s.find(current.key()) == null) merged.add(current);
+                merged.sort(Comparator.comparingLong(m -> m.start));
+                s = new Snapshot(Collections.unmodifiableList(merged), s.updatedAt, s.offline);
+            } else pinsChanged = false;
+            last = s;
+        }
+        publish(s);
         return s;
     }
 
@@ -168,8 +213,21 @@ public final class Feed {
 
     private List<Match> runAll(Collection<Callable<List<Match>>> tasks, int[] failures) {
         List<Match> out = new ArrayList<>();
+        List<Callable<List<Match>>> scoped = new ArrayList<>();
+        for (Callable<List<Match>> task : tasks) scoped.add(() -> {
+            Espn.Response<List<Match>> response = espn.request(() -> {
+                try { return task.call(); }
+                catch (java.io.IOException e) { throw e; }
+                catch (Exception e) { throw new java.io.IOException("Source unavailable", e); }
+            });
+            for (Match match : response.value) {
+                match.checkedAt = response.fetchedAt;
+                match.updatesDelayed = response.stale;
+            }
+            return response.value;
+        });
         try {
-            for (Future<List<Match>> f : pool.invokeAll(tasks, 25, TimeUnit.SECONDS)) {
+            for (Future<List<Match>> f : pool.invokeAll(scoped, 25, TimeUnit.SECONDS)) {
                 try {
                     out.addAll(f.get());
                 } catch (ExecutionException | CancellationException e) {

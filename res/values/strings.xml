@@ -60,8 +60,8 @@
     <string name="continue_plain">Continue</string>
 
     <!-- Onboarding -->
-    <string name="onb_title">Live scores,\nright in your island</string>
-    <string name="onb_body">Follow your teams and watch the score update around the camera. No need to open an app.</string>
+    <string name="onb_title">Your sports.\nEvery score.</string>
+    <string name="onb_body">Explore scores, fixtures and standings. Follow your teams, with live updates in the island on supported phones.</string>
     <string name="get_started">Get started</string>
     <string name="perm_title">Never miss a moment</string>
     <string name="perm_body">Scoreline needs two things to keep your island live during a match.</string>
@@ -100,6 +100,7 @@
     <string name="ch_suggest_body">Shown when a followed match starts but Scoreline can\'t open the island on its own.</string>
     <string name="act_stop">Hide from island</string>
     <string name="act_show">Show in island</string>
+    <string name="act_swap">Swap islands</string>
     <string name="alert_kickoff">Kick-off</string>
     <string name="alert_goal">Goal · %1$s</string>
     <string name="alert_touchdown">Touchdown · %1$s</string>

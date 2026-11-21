@@ -2,4 +2,11 @@
     <uses-sdk android:minSdkVersion="36" android:targetSdkVersion="36" />
     <application android:label="Scoreline test suite" android:allowBackup="false" />
     <instrumentation android:name="app.scoreline.live.SportsSimulation" android:targetPackage="app.scoreline" android:label="Scoreline sport simulations" />
+    <instrumentation android:name="app.scoreline.live.ExperienceSimulation" android:targetPackage="app.scoreline" android:label="Scoreline browsing integration" />
+    <instrumentation android:name="app.scoreline.live.ScreenReview" android:targetPackage="app.scoreline" android:label="Scoreline emulator screenshot walkthrough" />
+    <instrumentation android:name="app.scoreline.live.MatchDetailSimulation" android:targetPackage="app.scoreline" android:label="Scoreline all-sport match-screen integration" />
+    <instrumentation android:name="app.scoreline.widgets.WidgetSimulation" android:targetPackage="app.scoreline" android:label="Scoreline launcher widget integration" />
+    <instrumentation android:name="app.scoreline.ui.SpotlightSimulation" android:targetPackage="app.scoreline" android:label="Scoreline sport event motion integration" />
+    <instrumentation android:name="app.scoreline.ui.WidgetVisualReview" android:targetPackage="app.scoreline" android:label="Scoreline matched widget visual review" />
+    <instrumentation android:name="app.scoreline.ui.WidgetGallery" android:targetPackage="app.scoreline" android:label="Scoreline widget gallery" />
 </manifest>

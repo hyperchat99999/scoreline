@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/top"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="64dp"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp">
+
+        <ImageButton
+            android:id="@+id/back"
+            android:layout_width="@dimen/touch"
+            android:layout_height="@dimen/touch"
+            android:background="@drawable/bg_row"
+            android:contentDescription="@string/hub_back"
+            android:src="@drawable/ic_arrow_back" />
+
+        <TextView
+            android:id="@+id/hubTitle"
+            style="@style/Text.Title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/hubRefresh"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_row"
+            android:gravity="center"
+            android:minHeight="@dimen/touch"
+            android:minWidth="@dimen/touch"
+            android:padding="12dp"
+            android:src="@drawable/ic_refresh"
+            android:contentDescription="@string/hub_refresh" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/hubScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="24dp">
+
+            <LinearLayout
+                android:id="@+id/hubIdentity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:baselineAligned="false"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="20dp">
+
+                <app.scoreline.ui.widget.CrestView
+                    android:id="@+id/hubCrest"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="12dp"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/hubName"
+                    style="@style/Text.Display"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="22sp" />
+                <TextView android:id="@+id/hubFollow" style="@style/Text.Label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp" android:drawablePadding="4dp" android:gravity="center" android:minHeight="48dp" android:minWidth="88dp" android:paddingStart="12dp" android:paddingEnd="12dp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/hubContext"
+                style="@style/Text.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginEnd="20dp"
+                android:minHeight="24dp" />
+
+            <HorizontalScrollView
+                android:id="@+id/hubSectionScroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fillViewport="true"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/hubSections"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+            </HorizontalScrollView>
+
+            <LinearLayout
+                android:id="@+id/hubDates"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+            <LinearLayout
+                android:id="@+id/hubNotice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="20dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ProgressBar
+                    android:id="@+id/hubProgress"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="10dp"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/hubStatus"
+                    style="@style/Text.Caption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:accessibilityLiveRegion="polite" />
+
+                <TextView
+                    android:id="@+id/hubRetry"
+                    style="@style/Text.Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_row"
+                    android:gravity="center"
+                    android:minHeight="@dimen/touch"
+                    android:minWidth="@dimen/touch"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="@string/hub_retry"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/hubContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <TextView
+                style="@style/Text.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="20dp"
+                android:paddingTop="24dp"
+                android:paddingEnd="20dp"
+                android:text="@string/hub_source" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

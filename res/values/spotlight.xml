@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="spotlight_title">Match spotlight</string>
+    <string name="add_home_widget">Add home-screen widget</string>
+    <string name="spotlight_open">Open match</string>
+    <string name="spotlight_saved">Saved · %1$s</string>
+    <string name="spotlight_updated">Updated %1$s</string>
+    <string name="event_goal">GOAL</string>
+    <string name="event_score">SCORE</string>
+    <string name="event_wicket">WICKET</string>
+    <string name="event_lap">NEW LAP</string>
+    <string name="event_lead">LEAD CHANGE</string>
+    <string name="event_kickoff">STARTED</string>
+    <string name="event_final">FINAL</string>
+</resources>

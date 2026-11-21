@@ -33,16 +33,19 @@ final class FollowRows {
         TextView sub = row.findViewById(R.id.subtitle);
         sub.setVisibility(subtitle == null || subtitle.isEmpty() ? View.GONE : View.VISIBLE);
         sub.setText(subtitle);
-        row.findViewById(R.id.chevron).setVisibility(open != null ? View.VISIBLE : View.GONE);
-        if (open != null) row.setOnClickListener(v -> open.run());
-        else row.setClickable(false);
+        Runnable navigation = open != null ? open : () -> row.getContext().startActivity(f.kind == Follow.Kind.TEAM
+                ? TeamActivity.intent(row.getContext(), f.sport, f.league, f.team)
+                : CompetitionActivity.intent(row.getContext(), f.sport, f.league, f.name()));
+        row.findViewById(R.id.chevron).setVisibility(View.VISIBLE);
+        row.setOnClickListener(v -> navigation.run());
 
         TextView button = row.findViewById(R.id.follow);
         Views.followButton(button, app.store().isFollowing(f));
-        button.setContentDescription(row.getContext().getString(R.string.follow) + " " + f.name());
+        button.setContentDescription(row.getContext().getString(app.store().isFollowing(f) ? R.string.unfollow : R.string.follow) + " " + f.name());
         button.setOnClickListener(v -> {
             boolean now = app.store().toggle(f);
             Views.followButton(button, now);
+            button.setContentDescription(row.getContext().getString(now ? R.string.unfollow : R.string.follow) + " " + f.name());
             Views.confirm(v);
             if (changed != null) changed.run();
         });

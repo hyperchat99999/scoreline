@@ -105,6 +105,8 @@ public final class Match {
     /** Session for races ("Race", "Qualifying"). */
     public String session = "";
     public long start;
+    /** Published end timestamp, primarily for multi-day cricket; 0 when absent. */
+    public long end;
     public State state = State.PRE;
     /** Live clock: "67'", "HT", "Q4 2:31", "10.3 ov", "Lap 34/56". */
     public String clock = "";

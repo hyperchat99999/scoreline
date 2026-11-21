@@ -15,6 +15,8 @@ public final class Receiver extends BroadcastReceiver {
             // Try to go live straight away; if Android refuses, the check job will offer a tap to start.
             if (!LiveService.sync(c)) Scheduler.checkNow(c);
         } else {
+            // An update cancels the old widget buttons; redraw so taps work before the next score arrives.
+            app.scoreline.widgets.SportsWidgetProvider.updateAll(c);
             Scheduler.ensure(c);
             Scheduler.checkNow(c);
         }

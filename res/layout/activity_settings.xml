@@ -30,7 +30,7 @@
                 android:layout_width="@dimen/touch"
                 android:layout_height="@dimen/touch"
                 android:background="@drawable/bg_row"
-                android:contentDescription="@android:string/cancel"
+                android:contentDescription="@string/hub_back"
                 android:src="@drawable/ic_arrow_back" />
 
             <TextView
@@ -108,6 +108,7 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_row"
                 android:drawableStart="@drawable/ic_bolt"
+                android:drawableEnd="@drawable/ic_chevron_right"
                 android:drawablePadding="16dp"
                 android:gravity="center_vertical"
                 android:minHeight="64dp"
@@ -121,6 +122,7 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_row"
                 android:drawableStart="@drawable/ic_bell"
+                android:drawableEnd="@drawable/ic_chevron_right"
                 android:drawablePadding="16dp"
                 android:gravity="center_vertical"
                 android:minHeight="56dp"
@@ -135,12 +137,19 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_row"
                 android:drawableStart="@drawable/ic_add"
+                android:drawableEnd="@drawable/ic_chevron_right"
                 android:drawablePadding="16dp"
                 android:gravity="center_vertical"
                 android:minHeight="56dp"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/set_following" />
+            <TextView android:id="@+id/appearance" style="@style/Text.Body" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:minHeight="64dp" android:padding="16dp" android:drawableStart="@drawable/ic_theme" android:drawableEnd="@drawable/ic_chevron_right"
+                android:drawablePadding="16dp" android:gravity="center_vertical" android:background="@drawable/bg_row" />
+            <TextView android:id="@+id/addWidget" style="@style/Text.Body" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:minHeight="64dp" android:padding="16dp" android:drawableStart="@drawable/ic_calendar" android:drawableEnd="@drawable/ic_chevron_right"
+                android:drawablePadding="16dp" android:gravity="center_vertical" android:background="@drawable/bg_row" android:text="@string/add_home_widget" />
         </LinearLayout>
 
         <TextView

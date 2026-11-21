@@ -23,10 +23,13 @@ public final class Http {
     public static final class Body {
         public final byte[] bytes;
         public final boolean stale;
+        /** When these bytes were fetched, including when served from disk. */
+        public final long fetchedAt;
 
-        Body(byte[] bytes, boolean stale) {
+        Body(byte[] bytes, boolean stale, long fetchedAt) {
             this.bytes = bytes;
             this.stale = stale;
+            this.fetchedAt = fetchedAt;
         }
 
         public String text() {
@@ -61,7 +64,7 @@ public final class Http {
         File file = new File(dir, sha1(url));
         if (maxAgeMs > 0 && file.exists() && System.currentTimeMillis() - file.lastModified() < maxAgeMs) {
             try {
-                return new Body(read(file), false);
+                return new Body(read(file), false, file.lastModified());
             } catch (IOException ignored) {
                 // Fall through to the network.
             }
@@ -69,10 +72,10 @@ public final class Http {
         try {
             byte[] body = fetch(url);
             if (body.length > 0) { write(file, body); trimIfNeeded(); }
-            return new Body(body, false);
+            return new Body(body, false, System.currentTimeMillis());
         } catch (IOException e) {
             if (Thread.currentThread().isInterrupted()) throw e;
-            if (file.exists()) return new Body(read(file), true);
+            if (file.exists()) return new Body(read(file), true, file.lastModified());
             throw e;
         }
     }

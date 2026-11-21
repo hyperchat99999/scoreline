@@ -12,6 +12,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,7 +21,10 @@ import java.util.regex.Pattern;
 import app.scoreline.core.Http;
 import app.scoreline.core.Json;
 import app.scoreline.model.Match;
+import app.scoreline.model.MatchDetail;
+import app.scoreline.model.MatchRef;
 import app.scoreline.model.Sport;
+import app.scoreline.model.Standings;
 import app.scoreline.model.Team;
 import app.scoreline.model.Timeline;
 
@@ -35,6 +40,7 @@ public final class Espn {
     public static final long LONG = 7L * 24 * 3600_000;
 
     private static final String SITE = "https://site.api.espn.com/apis/site/v2/sports/";
+    private static final String TABLES = "https://site.api.espn.com/apis/v2/sports/";
     private static final String CRICKET_TICKER = "https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=cricket&lang=en";
     private static final String CRICKET_SERIES = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/";
     private static final String RACE_TIMING = "https://sports.core.api.espn.com/v2/sports/racing/leagues/";
@@ -49,6 +55,7 @@ public final class Espn {
     private final Http http;
     private final AtomicBoolean stale = new AtomicBoolean();
     private final ThreadLocal<Boolean> requestStale = ThreadLocal.withInitial(() -> false);
+    private final ThreadLocal<Long> requestTime = ThreadLocal.withInitial(() -> Long.MAX_VALUE);
 
     public Espn(Http http) {
         this.http = http;
@@ -63,10 +70,43 @@ public final class Espn {
         stale.set(false);
     }
 
+    @FunctionalInterface
+    public interface Source<T> {
+        T get() throws IOException;
+    }
+
+    /** Freshness belongs to this call, even while the followed feed is loading concurrently. */
+    public static final class Response<T> {
+        public final T value;
+        public final boolean stale;
+        public final long fetchedAt;
+
+        Response(T value, boolean stale, long fetchedAt) {
+            this.value = value;
+            this.stale = stale;
+            this.fetchedAt = fetchedAt;
+        }
+    }
+
+    public <T> Response<T> request(Source<T> source) throws IOException {
+        boolean previous = requestStale.get();
+        long previousTime = requestTime.get();
+        requestStale.set(false);
+        requestTime.set(Long.MAX_VALUE);
+        try {
+            T value = source.get();
+            return new Response<>(value, requestStale.get(), requestTime.get() == Long.MAX_VALUE ? 0 : requestTime.get());
+        } finally {
+            requestStale.set(previous || requestStale.get());
+            requestTime.set(Math.min(previousTime, requestTime.get()));
+        }
+    }
+
     // ---- Endpoints -----------------------------------------------------------------------------
 
     /** Matches in a competition; {@code dates} is "YYYYMMDD", "YYYYMM" or null for the current round. */
     public List<Match> scoreboard(Sport sport, String league, String dates, long maxAge) throws IOException {
+        if (sport == Sport.CRICKET) return cricketSeries(league, "", dates, maxAge);
         String url = SITE + sport.path + "/" + league + "/scoreboard" + (dates == null ? "" : "?dates=" + dates);
         JSONObject root = json(url, maxAge);
         String name = leagueName(sport, league, Json.first(root, "leagues"));
@@ -133,7 +173,12 @@ public final class Espn {
      * ticker has been seen stuck on "Scheduled" for a match that was in its final over.
      */
     public List<Match> cricketSeries(String seriesId, String seriesName, long maxAge) throws IOException {
-        JSONObject root = json(CRICKET_SERIES + seriesId + "/scoreboard", maxAge);
+        return cricketSeries(seriesId, seriesName, null, maxAge);
+    }
+
+    public List<Match> cricketSeries(String seriesId, String seriesName, String dates, long maxAge) throws IOException {
+        JSONObject root = json(CRICKET_SERIES + seriesId + "/scoreboard"
+                + (dates == null ? "" : "?dates=" + dates), maxAge);
         String name = seriesName.isEmpty() ? Json.str(Json.first(root, "leagues"), "name") : seriesName;
         List<Match> out = new ArrayList<>();
         for (JSONObject e : Json.list(root, "events")) {
@@ -148,7 +193,11 @@ public final class Espn {
 
     /** All teams in a competition, alphabetically. */
     public List<Team> teams(Sport sport, String league) throws IOException {
-        JSONObject root = json(SITE + sport.path + "/" + league + "/teams", LONG);
+        return teams(sport, league, LONG);
+    }
+
+    public List<Team> teams(Sport sport, String league, long maxAge) throws IOException {
+        JSONObject root = json(SITE + sport.path + "/" + league + "/teams", maxAge);
         List<Team> out = new ArrayList<>();
         for (JSONObject t : Json.list(Json.first(Json.first(root, "sports"), "leagues"), "teams")) {
             JSONObject team = t.optJSONObject("team");
@@ -160,13 +209,77 @@ public final class Espn {
 
     /** A fresh copy of {@code m} for live tracking, or null if ESPN no longer lists it. */
     public Match refresh(Match m) throws IOException {
-        requestStale.set(false);
-        Match result = refreshInternal(m);
+        Response<Match> response = request(() -> refreshInternal(m));
+        Match result = response.value;
         if (result != null) {
-            result.updatesDelayed = requestStale.get();
-            result.checkedAt = result.updatesDelayed ? m.checkedAt : System.currentTimeMillis();
+            result.updatesDelayed = response.stale;
+            result.checkedAt = response.fetchedAt;
         }
         return result;
+    }
+
+    /** Resolve an event without a followed-feed entry. F1 identities retain their session suffix. */
+    public Match lookup(MatchRef ref, long maxAge) throws IOException {
+        if (ref == null) return null;
+        if (ref.sport == Sport.RACING) {
+            long start = ref.start;
+            String weekend = ref.id.split(":", 2)[0];
+            if (start == 0) start = Json.time(Json.str(json(RACE_TIMING + ref.league + "/events/" + weekend, MEDIUM), "date"));
+            if (start == 0) return null;
+            List<Match> sessions = scoreboard(ref.sport, ref.league, day(start, ZoneOffset.UTC).substring(0, 6), maxAge);
+            Match exact = find(sessions, ref.id);
+            if (exact != null) return exact;
+            // Old notification keys identified a whole weekend. Pick its live/next session once.
+            if (!ref.id.contains(":")) {
+                Match chosen = null;
+                for (Match match : sessions) {
+                    if (!match.id.startsWith(weekend + ":")) continue;
+                    if (match.isLive()) return match;
+                    if (match.state == Match.State.PRE && (chosen == null || chosen.state != Match.State.PRE || match.start < chosen.start)) chosen = match;
+                    else if (chosen == null || (chosen.state != Match.State.PRE && match.start > chosen.start)) chosen = match;
+                }
+                return chosen;
+            }
+            return null;
+        }
+        if (ref.start > 0) {
+            try {
+                Match match = find(scoreboard(ref.sport, ref.league, espnDay(ref.start), maxAge), ref.id);
+                if (match != null) return match;
+            } catch (IOException ignored) {
+                // A direct event summary also works when a dated board is unavailable.
+            }
+        }
+        JSONObject root = summary(ref.sport, ref.league, ref.id, maxAge);
+        JSONObject header = root.optJSONObject("header");
+        if (header == null || !ref.id.equals(Json.str(header, "id"))) return null;
+        Match match = ref.sport == Sport.CRICKET
+                ? cricketSeriesEvent(header, ref.league, ref.leagueName)
+                : event(header, ref.sport, ref.league, leagueName(ref.sport, ref.league, Json.first(header, "leagues")));
+        if (match != null) {
+            if (match.venue.isEmpty()) match.venue = Json.str(Json.obj(root, "gameInfo", "venue"), "fullName");
+            if (match.link.isEmpty()) match.link = link(header);
+        }
+        return match;
+    }
+
+    public Standings standings(Sport sport, String league) throws IOException {
+        return standings(sport, league, MEDIUM);
+    }
+
+    public Standings standings(Sport sport, String league, long maxAge) throws IOException {
+        if (sport == Sport.CRICKET || sport == Sport.RACING) return new Standings(false, List.of());
+        return parseStandings(json(TABLES + sport.path + "/" + league + "/standings", maxAge), sport);
+    }
+
+    public MatchDetail details(Match match) throws IOException {
+        if (match.sport == Sport.RACING) return new MatchDetail(List.of(), match.summary, match.link);
+        return parseDetails(summary(match.sport, match.league, match.id, match.isLive() ? LIVE : MEDIUM), match);
+    }
+
+    private JSONObject summary(Sport sport, String league, String id, long maxAge) throws IOException {
+        String base = sport == Sport.CRICKET ? CRICKET_SERIES + league : SITE + sport.path + "/" + league;
+        return json(base + "/summary?event=" + id, maxAge);
     }
 
     private Match refreshInternal(Match m) throws IOException {
@@ -209,6 +322,7 @@ public final class Espn {
         m.leagueName = leagueName;
         m.start = Json.time(Json.str(e, "date"));
         if (m.start == 0) m.start = Json.time(Json.str(comp, "date"));
+        if (m.id.isEmpty() || m.start == 0) return null;
         JSONObject status = comp.optJSONObject("status");
         applyStatus(m, status != null ? status : e.optJSONObject("status"));
         for (JSONObject c : Json.list(comp, "competitors")) {
@@ -217,7 +331,7 @@ public final class Espn {
             else if (m.home == null) m.home = side;
             else m.away = side;
         }
-        if (m.home == null || m.away == null) return null;
+        if (!validSides(m)) return null;
         if (sport == Sport.SOCCER) moments(m, comp);
         overtime(m, Json.obj(e, "season"));
         m.venue = Json.str(Json.obj(comp, "venue"), "fullName");
@@ -232,7 +346,8 @@ public final class Espn {
         Match.Side side = new Match.Side(team(t != null ? t : c, sport), display, "", Json.bool(c, "winner"));
         for (JSONObject l : Json.list(c, "linescores")) {
             String v = Json.str(l, "displayValue");
-            side.periods.add(v.isEmpty() ? String.valueOf(Math.round(l.optDouble("value", 0))) : v);
+            if (v.isEmpty() && l.opt("value") instanceof Number) v = String.valueOf(Math.round(l.optDouble("value")));
+            if (!v.isEmpty()) side.periods.add(v);
         }
         return side;
     }
@@ -344,6 +459,8 @@ public final class Espn {
         m.leagueName = leagueName;
         m.title = Json.str(e, "title").replaceAll("\\s*\\((D/N|N)\\)$", "");
         m.start = Json.time(Json.str(e, "date"));
+        m.end = Json.time(Json.str(e, "endDate"));
+        if (m.id.isEmpty() || m.start == 0) return null;
         JSONObject full = e.optJSONObject("fullStatus");
         String state = Json.str(e, "status");
         if (full != null && full.optJSONObject("type") != null) applyStatus(m, full);
@@ -372,12 +489,14 @@ public final class Espn {
             else if (m.home == null) m.home = side;
             else m.away = side;
         }
-        if (m.home == null || m.away == null) return null;
+        if (!validSides(m)) return null;
         if (limit == 0) limit = oversFor(Json.str(Json.obj(e, "class"), "generalClassCard"));
         m.oversLimit = limit;
         Match.Side batting = m.battingTeamId.equals(m.away.team.id) ? m.away : m.home;
         if (m.state == Match.State.LIVE && !batting.overs.isEmpty()) m.clock = batting.overs + " ov";
-        m.link = "https://www.espncricinfo.com/";
+        m.link = Json.str(e, "link");
+        if (m.link.isEmpty()) m.link = link(e);
+        if (m.link.isEmpty()) m.link = "https://www.espncricinfo.com/";
         return m;
     }
 
@@ -391,9 +510,12 @@ public final class Espn {
         m.leagueName = seriesName;
         m.title = Json.str(comp, "description");
         m.start = Json.time(Json.str(e, "date"));
+        if (m.start == 0) m.start = Json.time(Json.str(comp, "date"));
+        m.end = Json.time(Json.str(e, "endDate"));
+        if (m.end == 0) m.end = Json.time(Json.str(comp, "endDate"));
+        if (m.id.isEmpty() || m.start == 0) return null;
         JSONObject status = comp.optJSONObject("status");
         JSONObject type = Json.obj(status, "type");
-        String state = Json.str(type, "state");
         applyStatus(m, status);
         m.status = Json.str(type, "shortDetail");
         m.summary = Json.str(status, "summary");
@@ -423,13 +545,14 @@ public final class Espn {
             else if (m.home == null) m.home = side;
             else m.away = side;
         }
-        if (m.home == null || m.away == null) return null;
+        if (!validSides(m)) return null;
         if (limit == 0) limit = oversFor(Json.str(Json.obj(comp, "class"), "generalClassCard"));
         m.oversLimit = limit;
         Match.Side batting = m.away.team.id.equals(m.battingTeamId) ? m.away : m.home;
         if (m.state == Match.State.LIVE && !batting.overs.isEmpty()) m.clock = batting.overs + " ov";
         if (m.summary.isEmpty() && m.state == Match.State.LIVE && target > 0 && limit > 0) m.summary = equation(batting, target, limit);
-        m.link = "https://www.espncricinfo.com/";
+        m.link = link(e);
+        if (m.link.isEmpty()) m.link = "https://www.espncricinfo.com/";
         return m;
     }
 
@@ -468,6 +591,7 @@ public final class Espn {
         m.title = Json.str(e, "name");
         m.venue = Json.str(Json.obj(e, "circuit"), "fullName");
         m.start = Json.time(Json.str(pick, "date"));
+        if (Json.str(e, "id").isEmpty() || m.start == 0) return null;
         m.session = session(Json.str(Json.obj(pick, "type"), "abbreviation"));
         applyStatus(m, pick.optJSONObject("status"));
         if (m.state == Match.State.LIVE) m.clock = m.isRace() && m.period > 0 ? "Lap " + m.period : shortSession(m.session);
@@ -568,10 +692,128 @@ public final class Espn {
         }
     }
 
+    // ---- Optional tables and match information --------------------------------------------------
+
+    static Standings parseStandings(JSONObject root, Sport sport) {
+        List<Standings.Group> groups = new ArrayList<>();
+        if (root.optJSONObject("standings") != null) standingsGroups(root, sport, "", groups);
+        else for (JSONObject child : Json.list(root, "children")) standingsGroups(child, sport, "", groups);
+        return new Standings(true, groups);
+    }
+
+    private static void standingsGroups(JSONObject node, Sport sport, String parent, List<Standings.Group> out) {
+        if (node == null) return;
+        String name = Json.str(node, "name");
+        if (name.isEmpty()) name = parent;
+        else if (!parent.isEmpty()) name = parent + " · " + name;
+        JSONObject table = node.optJSONObject("standings");
+        List<JSONObject> entries = Json.list(table, "entries");
+        if (!entries.isEmpty()) {
+            Map<String, Standings.Column> columns = new LinkedHashMap<>();
+            for (JSONObject entry : entries) {
+                for (JSONObject stat : Json.list(entry, "stats")) {
+                    String key = Json.str(stat, "name");
+                    if (key.isEmpty() || key.equals("rank") || key.equals("playoffSeed") || key.equals("rankChange")) continue;
+                    String label = Json.str(stat, "abbreviation");
+                    if (label.isEmpty()) label = Json.str(stat, "shortDisplayName");
+                    if (label.isEmpty()) label = Json.str(stat, "displayName");
+                    if (!label.isEmpty() && !Json.str(stat, "displayValue").isEmpty()) columns.putIfAbsent(key, new Standings.Column(key, label));
+                }
+            }
+            List<String> priorities = sport == Sport.SOCCER
+                    ? List.of("gamesPlayed", "wins", "ties", "losses", "pointDifferential", "points")
+                    : sport == Sport.HOCKEY ? List.of("gamesPlayed", "wins", "losses", "otLosses", "points")
+                    : List.of("wins", "losses", "ties", "winPercent", "gamesBehind", "points");
+            List<Standings.Column> ordered = new ArrayList<>(columns.values());
+            ordered.sort(Comparator.comparingInt(column -> {
+                int index = priorities.indexOf(column.name);
+                return index < 0 ? Integer.MAX_VALUE : index;
+            }));
+            List<Standings.Row> rows = new ArrayList<>();
+            for (JSONObject entry : entries) {
+                JSONObject team = entry.optJSONObject("team");
+                if (team == null || Json.str(team, "id").isEmpty() || Json.str(team, "displayName").isEmpty()) continue;
+                Map<String, String> values = new LinkedHashMap<>();
+                for (JSONObject stat : Json.list(entry, "stats")) values.put(Json.str(stat, "name"), Json.str(stat, "displayValue"));
+                String rank = values.getOrDefault("rank", "");
+                if (rank.isEmpty()) rank = values.getOrDefault("playoffSeed", "");
+                List<String> cells = new ArrayList<>();
+                for (Standings.Column column : ordered) cells.add(values.getOrDefault(column.name, ""));
+                rows.add(new Standings.Row(rank, team(team, sport), cells));
+            }
+            rows.sort(Comparator.comparingInt(row -> rankNumber(row.rank)));
+            if (!rows.isEmpty()) out.add(new Standings.Group(name, ordered, rows));
+        }
+        for (JSONObject child : Json.list(node, "children")) standingsGroups(child, sport, name, out);
+    }
+
+    private static int rankNumber(String rank) {
+        try {
+            int number = Integer.parseInt(rank);
+            return number > 0 ? number : Integer.MAX_VALUE;
+        } catch (NumberFormatException e) {
+            return Integer.MAX_VALUE;
+        }
+    }
+
+    static MatchDetail parseDetails(JSONObject root, Match match) {
+        Map<String, String[]> statistics = new LinkedHashMap<>();
+        if (match.home != null && match.away != null) {
+            for (JSONObject side : Json.list(root.optJSONObject("boxscore"), "teams")) {
+                String id = Json.str(Json.obj(side, "team"), "id");
+                int index = match.home.team.id.equals(id) ? 1 : match.away.team.id.equals(id) ? 2 : -1;
+                if (index < 0) continue;
+                List<String[]> values = new ArrayList<>();
+                for (JSONObject category : Json.list(side, "statistics")) {
+                    if (match.sport != Sport.BASEBALL || category.optJSONArray("stats") == null) {
+                        String label = Json.str(category, "label");
+                        if (label.isEmpty()) label = Json.str(category, "displayName");
+                        values.add(new String[] {Json.str(category, "name"), label, Json.str(category, "displayValue")});
+                        continue;
+                    }
+                    String group = Json.str(category, "name");
+                    for (JSONObject item : Json.list(category, "stats")) {
+                        String name = group + "." + Json.str(item, "name");
+                        // Keep the comparison concise, with batting and pitching identities distinct.
+                        if (!List.of("batting.runs", "batting.hits", "batting.homeRuns", "batting.RBIs",
+                                "batting.avg", "batting.OPS", "batting.strikeouts", "batting.runnersLeftOnBase",
+                                "pitching.ERA", "pitching.earnedRuns", "pitching.walks", "pitching.hits",
+                                "pitching.strikeouts", "fielding.errors").contains(name)) continue;
+                        values.add(new String[] {name, Json.str(category, "displayName") + " / " + Json.str(item, "displayName"),
+                                Json.str(item, "displayValue")});
+                    }
+                }
+                for (String[] stat : values) {
+                    String key = stat[0], label = stat[1], value = stat[2];
+                    if (key.isEmpty() || label.isEmpty() || value.isEmpty()) continue;
+                    String[] pair = statistics.get(key);
+                    if (pair == null) {
+                        pair = new String[] {label, "", "", key};
+                        statistics.put(key, pair);
+                    }
+                    pair[index] = value;
+                }
+            }
+        }
+        List<MatchDetail.Stat> stats = new ArrayList<>();
+        for (String[] pair : statistics.values()) stats.add(new MatchDetail.Stat(pair[3], pair[0], pair[1], pair[2]));
+        String summary = "";
+        String link = match.link;
+        JSONObject article = root.optJSONObject("article");
+        if (match.id.equals(Json.str(article, "gameId"))) {
+            summary = Json.str(article, "description");
+            String articleLink = Json.str(Json.obj(article, "links", "web"), "href");
+            if (!articleLink.isEmpty()) link = articleLink;
+        }
+        if (summary.isEmpty()) summary = match.summary;
+        return new MatchDetail(stats, summary, link);
+    }
+
     // ---- Helpers -------------------------------------------------------------------------------
 
     private JSONObject json(String url, long maxAge) throws IOException {
         Http.Body body = http.get(url, maxAge);
+        requestTime.set(Math.min(requestTime.get(), body.fetchedAt));
         if (body.stale) { stale.set(true); requestStale.set(true); }
         try {
             return new JSONObject(body.text());
@@ -604,6 +846,11 @@ public final class Espn {
     private static Match find(List<Match> pool, String id) {
         for (Match m : pool) if (m.id.equals(id)) return m;
         return null;
+    }
+
+    private static boolean validSides(Match match) {
+        return match.home != null && match.away != null && !match.home.team.id.isEmpty()
+                && !match.away.team.id.isEmpty() && !match.home.team.name.isEmpty() && !match.away.team.name.isEmpty();
     }
 
     private static String day(long ms, ZoneId zone) {

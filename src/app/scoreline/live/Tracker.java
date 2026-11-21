@@ -17,8 +17,8 @@ public final class Tracker {
     /** Matches whose start passed this long ago without ESPN marking them live are ignored. */
     private static final long LATE_START = 3 * 3600_000L;
     /**
-     * Matches followed at once. Only the first is in the island (the island keeps one card per
-     * app); the rest are live cards in the shade.
+     * Matches followed at once. The first is in the island and the second in the side island where
+     * there is one (a second Live Update elsewhere); the third is a live card in the shade.
      */
     static final int MAX = 3;
 

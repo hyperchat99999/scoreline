@@ -48,7 +48,7 @@ public final class CheckJob extends JobService {
     }
 
     static void run(App app) {
-        if (app.store().follows().isEmpty()) return;
+        if (app.store().follows().isEmpty() && !app.store().hasPins()) return;
         long now = System.currentTimeMillis();
         Feed.Snapshot s = app.feed().load(false);
         if (Thread.currentThread().isInterrupted()) return;

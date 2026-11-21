@@ -22,6 +22,10 @@ public class HttpTest {
         try {
             Http http = new Http(dir.toFile());
             String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/score";
+            Http.Body first = http.get(url, 60_000);
+            Thread.sleep(5);
+            Http.Body cached = http.get(url, 60_000);
+            if (cached.fetchedAt > first.fetchedAt) throw new AssertionError("Cache reads must retain the source fetch time");
             List<Callable<String>> calls = new ArrayList<>();
             for (int i = 0; i < 16; i++) calls.add(() -> http.get(url, 60_000).text());
             for (Future<String> result : pool.invokeAll(calls))
